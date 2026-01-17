@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:http_parser/http_parser.dart' as http_parser;
 import '../core/constants/api_constants.dart';
 import '../models/story.dart';
 import 'api_client.dart';
@@ -49,6 +51,20 @@ class StoryService {
     return data.map((s) => Story.fromJson(s)).toList();
   }
 
+  Future<List<Story>> getUserStoriesById(int userId) async {
+    final response = await _apiClient.get(ApiConstants.storiesByUserId(userId));
+    final data = response.data['stories'] ?? response.data['data'] ?? response.data;
+
+    // Handle case where data is a Map instead of List
+    if (data is Map) {
+      return [];
+    }
+    if (data is! List) {
+      return [];
+    }
+    return data.map((s) => Story.fromJson(s)).toList();
+  }
+
   Future<Story> getStory(int id) async {
     final response = await _apiClient.get('${ApiConstants.stories}/$id');
     return Story.fromJson(response.data['story'] ?? response.data);
@@ -77,13 +93,75 @@ class StoryService {
     String? content,
     int duration = 5,
   }) async {
-    final formData = FormData.fromMap({
-      'type': type,
-      'media': await MultipartFile.fromFile(filePath),
-      'content': content,
-      'duration': duration,
-    });
+    final filename = filePath.split('/').last;
+    final extension = filename.split('.').last.toLowerCase();
+    String contentType;
 
+    if (type == 'image') {
+      switch (extension) {
+        case 'png':
+          contentType = 'image/png';
+          break;
+        case 'gif':
+          contentType = 'image/gif';
+          break;
+        case 'webp':
+          contentType = 'image/webp';
+          break;
+        case 'jpg':
+        case 'jpeg':
+        default:
+          contentType = 'image/jpeg';
+          break;
+      }
+    } else {
+      // video
+      switch (extension) {
+        case 'mov':
+          contentType = 'video/quicktime';
+          break;
+        case 'avi':
+          contentType = 'video/x-msvideo';
+          break;
+        case 'mkv':
+          contentType = 'video/x-matroska';
+          break;
+        case 'webm':
+          contentType = 'video/webm';
+          break;
+        case 'mp4':
+        default:
+          contentType = 'video/mp4';
+          break;
+      }
+    }
+
+    // Debug logging for story creation
+    debugPrint('=== Creating Story ===');
+    debugPrint('Type: $type');
+    debugPrint('File path: $filePath');
+    debugPrint('Filename: $filename');
+    debugPrint('Extension: $extension');
+    debugPrint('Content-Type: $contentType');
+    debugPrint('Has content text: ${content != null && content.isNotEmpty}');
+    debugPrint('Duration: $duration');
+    debugPrint('=====================');
+
+    final Map<String, dynamic> formDataMap = {
+      'type': type,
+      'media': await MultipartFile.fromFile(
+        filePath,
+        filename: filename,
+        contentType: http_parser.MediaType.parse(contentType),
+      ),
+      'duration': duration,
+    };
+
+    if (content != null && content.isNotEmpty) {
+      formDataMap['content'] = content;
+    }
+
+    final formData = FormData.fromMap(formDataMap);
     final response = await _apiClient.uploadFile(
       ApiConstants.stories,
       data: formData,
@@ -139,5 +217,29 @@ class StoryService {
   Future<StoryStats> getStats() async {
     final response = await _apiClient.get(ApiConstants.storiesStats);
     return StoryStats.fromJson(response.data);
+  }
+
+  // ==================== COMMENTS ====================
+
+  Future<List<StoryComment>> getComments(int storyId) async {
+    final response = await _apiClient.get('${ApiConstants.stories}/$storyId/comments');
+    final data = response.data['comments'] ?? response.data['data'] ?? [];
+    return (data as List).map((c) => StoryComment.fromJson(c)).toList();
+  }
+
+  Future<StoryComment> addComment(int storyId, String content, {int? parentId}) async {
+    final response = await _apiClient.post(
+      '${ApiConstants.stories}/$storyId/comments',
+      data: {
+        'content': content,
+        if (parentId != null) 'parent_id': parentId,
+      },
+    );
+    return StoryComment.fromJson(response.data['comment'] ?? response.data);
+  }
+
+  Future<bool> deleteComment(int storyId, int commentId) async {
+    final response = await _apiClient.delete('${ApiConstants.stories}/$storyId/comments/$commentId');
+    return response.data['success'] ?? true;
   }
 }

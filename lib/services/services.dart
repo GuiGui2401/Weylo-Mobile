@@ -13,3 +13,4 @@ export 'wallet_service.dart';
 export 'premium_service.dart';
 export 'notification_service.dart';
 export 'websocket_service.dart';
+export 'monetization_service.dart';

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
+import '../services/user_service.dart';
 import '../services/websocket_service.dart';
 import '../core/errors/exceptions.dart';
 
@@ -11,6 +12,7 @@ class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final StorageService _storage = StorageService();
   final WebSocketService _webSocket = WebSocketService();
+  final UserService _userService = UserService();
 
   AuthStatus _status = AuthStatus.initial;
   User? _user;
@@ -18,6 +20,7 @@ class AuthProvider extends ChangeNotifier {
 
   AuthStatus get status => _status;
   User? get user => _user;
+  User? get currentUser => _user; // Alias for user
   String? get error => _error;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
   bool get isLoading => _status == AuthStatus.loading;
@@ -182,6 +185,27 @@ class AuthProvider extends ChangeNotifier {
   void updateUser(User user) {
     _user = user;
     _storage.saveUser(user);
+    notifyListeners();
+  }
+
+  Future<void> updateSettings(Map<String, dynamic> settings) async {
+    if (_user == null) return;
+
+    // Merge with existing settings
+    final currentSettings = _user!.settings ?? UserSettings();
+    final newSettings = UserSettings(
+      notificationsEnabled: settings['notifications_enabled'] ?? currentSettings.notificationsEnabled,
+      emailNotifications: settings['email_notifications'] ?? currentSettings.emailNotifications,
+      pushNotifications: settings['push_notifications'] ?? currentSettings.pushNotifications,
+      showOnlineStatus: settings['show_online_status'] ?? currentSettings.showOnlineStatus,
+      allowAnonymousMessages: settings['allow_anonymous_messages'] ?? currentSettings.allowAnonymousMessages,
+      showNameOnPosts: settings['show_name_on_posts'] ?? currentSettings.showNameOnPosts,
+      showPhotoOnPosts: settings['show_photo_on_posts'] ?? currentSettings.showPhotoOnPosts,
+      language: settings['language'] ?? currentSettings.language,
+      theme: settings['theme'] ?? currentSettings.theme,
+    );
+
+    _user = await _userService.updateSettings(newSettings);
     notifyListeners();
   }
 

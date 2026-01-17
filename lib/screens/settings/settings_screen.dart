@@ -11,6 +11,9 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
+    final authProvider = context.watch<AuthProvider>();
+    final currentLanguage = authProvider.currentUser?.settings?.language ?? 'fr';
+    final languageLabel = currentLanguage == 'fr' ? 'Français' : 'English';
 
     return Scaffold(
       appBar: AppBar(
@@ -48,8 +51,15 @@ class SettingsScreen extends StatelessWidget {
               onChanged: (value) {
                 themeProvider.toggleTheme();
               },
-              activeColor: AppColors.primary,
+              activeColor: AppColors.secondary,
+              activeTrackColor: AppColors.primary.withOpacity(0.5),
             ),
+          ),
+          _buildSettingItem(
+            icon: Icons.language_outlined,
+            title: 'Langue',
+            subtitle: languageLabel,
+            onTap: () => _showLanguageDialog(context),
           ),
 
           const Divider(),
@@ -64,7 +74,7 @@ class SettingsScreen extends StatelessWidget {
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.amber,
+                gradient: AppColors.primaryGradient,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
@@ -76,6 +86,23 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+          _buildSettingItem(
+            icon: Icons.subscriptions_outlined,
+            title: 'Mes abonnements',
+            subtitle: 'Pass Premium et abonnements cibls',
+            onTap: () => context.push('/subscriptions'),
+          ),
+          _buildSettingItem(
+            icon: Icons.tune_outlined,
+            title: 'Rglages Premium',
+            onTap: () => context.push('/premium-settings'),
+          ),
+          _buildSettingItem(
+            icon: Icons.bar_chart_outlined,
+            title: 'Revenus',
+            subtitle: 'Creator Fund et revenus pub',
+            onTap: () => context.push('/earnings'),
           ),
 
           const Divider(),
@@ -176,6 +203,71 @@ class SettingsScreen extends StatelessWidget {
       trailing: trailing ?? (onTap != null ? const Icon(Icons.chevron_right) : null),
       onTap: onTap,
     );
+  }
+
+  void _showLanguageDialog(BuildContext context) {
+    final currentLanguage = context.read<AuthProvider>().currentUser?.settings?.language ?? 'fr';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Choisir la langue'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Text('🇫🇷', style: TextStyle(fontSize: 24)),
+              title: const Text('Français'),
+              trailing: currentLanguage == 'fr'
+                  ? const Icon(Icons.check, color: Colors.green)
+                  : null,
+              onTap: () {
+                Navigator.pop(context);
+                _updateLanguage(context, 'fr');
+              },
+            ),
+            ListTile(
+              leading: const Text('🇬🇧', style: TextStyle(fontSize: 24)),
+              title: const Text('English'),
+              trailing: currentLanguage == 'en'
+                  ? const Icon(Icons.check, color: Colors.green)
+                  : null,
+              onTap: () {
+                Navigator.pop(context);
+                _updateLanguage(context, 'en');
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _updateLanguage(BuildContext context, String language) async {
+    try {
+      await context.read<AuthProvider>().updateSettings({'language': language});
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(language == 'fr'
+                ? 'Langue changée en Français'
+                : 'Language changed to English'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e')),
+        );
+      }
+    }
   }
 
   void _showLogoutDialog(BuildContext context) {

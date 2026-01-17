@@ -66,47 +66,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        maxChildSize: 0.9,
-        minChildSize: 0.5,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Rechercher dans les conversations...',
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onChanged: (query) {
-                  // TODO: Implement search filtering
-                },
-              ),
-            ),
-            Expanded(
-              child: _conversations.isEmpty
-                  ? const Center(child: Text('Aucune conversation'))
-                  : ListView.builder(
-                      controller: scrollController,
-                      itemCount: _conversations.length,
-                      itemBuilder: (context, index) => _ConversationTile(
-                        conversation: _conversations[index],
-                        onTap: () {
-                          Navigator.pop(context);
-                          context.push('/chat/${_conversations[index].id}');
-                        },
-                      ),
-                    ),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) => _ConversationSearchSheet(conversations: _conversations),
     );
   }
 
@@ -157,12 +117,117 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Start new conversation
-          context.push('/new-chat');
-        },
-        child: const Icon(Icons.chat),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          onPressed: () {
+            // Start new conversation
+            context.push('/new-chat');
+          },
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: const Icon(Icons.chat, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+class _ConversationSearchSheet extends StatefulWidget {
+  final List<Conversation> conversations;
+
+  const _ConversationSearchSheet({required this.conversations});
+
+  @override
+  State<_ConversationSearchSheet> createState() => _ConversationSearchSheetState();
+}
+
+class _ConversationSearchSheetState extends State<_ConversationSearchSheet> {
+  String _searchQuery = '';
+  List<Conversation> _filteredConversations = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredConversations = widget.conversations;
+  }
+
+  void _filterConversations(String query) {
+    setState(() {
+      _searchQuery = query.toLowerCase();
+      if (_searchQuery.isEmpty) {
+        _filteredConversations = widget.conversations;
+      } else {
+        final currentUserId = context.read<AuthProvider>().user?.id ?? 0;
+        _filteredConversations = widget.conversations.where((conversation) {
+          final otherUser = conversation.getOtherParticipant(currentUserId);
+          final username = otherUser?.username.toLowerCase() ?? '';
+          final fullName = otherUser?.fullName.toLowerCase() ?? '';
+          final lastMessage = conversation.lastMessage?.content.toLowerCase() ?? '';
+
+          return username.contains(_searchQuery) ||
+                 fullName.contains(_searchQuery) ||
+                 lastMessage.contains(_searchQuery);
+        }).toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      maxChildSize: 0.9,
+      minChildSize: 0.5,
+      expand: false,
+      builder: (context, scrollController) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Rechercher dans les conversations...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onChanged: _filterConversations,
+            ),
+          ),
+          Expanded(
+            child: _filteredConversations.isEmpty
+                ? Center(
+                    child: Text(
+                      _searchQuery.isEmpty
+                        ? 'Aucune conversation'
+                        : 'Aucun résultat trouvé',
+                    ),
+                  )
+                : ListView.builder(
+                    controller: scrollController,
+                    itemCount: _filteredConversations.length,
+                    itemBuilder: (context, index) => _ConversationTile(
+                      conversation: _filteredConversations[index],
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.push('/chat/${_filteredConversations[index].id}');
+                      },
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
@@ -273,7 +338,7 @@ class _ConversationTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                gradient: AppColors.primaryGradient,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(

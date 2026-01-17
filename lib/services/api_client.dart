@@ -45,8 +45,16 @@ class ApiClient {
         },
         onError: (error, handler) {
           if (kDebugMode) {
-            print('ERROR[${error.response?.statusCode}] => PATH: ${error.requestOptions.path}');
+            print('======= API ERROR =======');
+            print('STATUS: ${error.response?.statusCode}');
+            print('PATH: ${error.requestOptions.path}');
+            print('METHOD: ${error.requestOptions.method}');
+            print('ERROR TYPE: ${error.type}');
             print('ERROR MESSAGE: ${error.message}');
+            if (error.response?.data != null) {
+              print('RESPONSE DATA: ${error.response?.data}');
+            }
+            print('========================');
           }
           return handler.next(error);
         },
@@ -181,6 +189,17 @@ class ApiClient {
 
     if (data is Map<String, dynamic>) {
       message = data['message'] ?? message;
+    }
+
+    // Ignore 403 errors from Pusher/Reverb WebSocket authentication
+    // These are expected during WebSocket connections and shouldn't be shown to users
+    if (statusCode == 403 &&
+        (response.requestOptions.path.contains('broadcasting/auth') ||
+         response.requestOptions.path.contains('pusher') ||
+         response.requestOptions.path.contains('reverb'))) {
+      if (kDebugMode) print('WebSocket 403 error suppressed (expected during auth)');
+      // Return a silent exception that won't show to users
+      return AppException(message: '', statusCode: 403);
     }
 
     switch (statusCode) {

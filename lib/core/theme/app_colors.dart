@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Primary Colors
-  static const Color primary = Color(0xFF6C5CE7);
-  static const Color primaryLight = Color(0xFF8B7EED);
-  static const Color primaryDark = Color(0xFF5849C4);
+  // Primary Colors - Violet
+  static const Color primary = Color(0xFF8B5CF6);
+  static const Color primaryLight = Color(0xFFA78BFA);
+  static const Color primaryDark = Color(0xFF7C3AED);
 
-  // Secondary Colors
-  static const Color secondary = Color(0xFFFF6B9D);
-  static const Color secondaryLight = Color(0xFFFF8AB5);
-  static const Color secondaryDark = Color(0xFFE55A8A);
+  // Secondary Colors - Rose/Pink
+  static const Color secondary = Color(0xFFEC4899);
+  static const Color secondaryLight = Color(0xFFF472B6);
+  static const Color secondaryDark = Color(0xFFDB2777);
 
   // Accent Colors
   static const Color accent = Color(0xFF00D9FF);
@@ -66,9 +66,23 @@ class AppColors {
 
   // Gradients
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [primary, secondary],
+    colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
+  );
+
+  // Gradient pour la navbar et autres éléments UI
+  static const LinearGradient navbarGradient = LinearGradient(
+    colors: [Color(0xFF8B5CF6), Color(0xFFA855F7), Color(0xFFEC4899)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  // Gradient vertical pour AppBar
+  static const LinearGradient appBarGradient = LinearGradient(
+    colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
   );
 
   static const LinearGradient premiumGradient = LinearGradient(

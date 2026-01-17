@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/feed_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/stories/stories_bar.dart';
 import '../../widgets/confessions/confession_card.dart';
 import '../../widgets/common/empty_state.dart';
@@ -52,25 +53,45 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Weylo',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
+        title: ShaderMask(
+          shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
+          child: const Text(
+            'Weylo',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
+              color: Colors.white,
+            ),
           ),
         ),
         centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_box_outlined),
+            icon: ShaderMask(
+              shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
+              child: const Icon(Icons.search, color: Colors.white),
+            ),
+            onPressed: () {
+              context.push('/search');
+            },
+            tooltip: 'Rechercher',
+          ),
+          IconButton(
+            icon: ShaderMask(
+              shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
+              child: const Icon(Icons.add_box_outlined, color: Colors.white),
+            ),
             onPressed: () {
               _showCreatePostSheet();
             },
           ),
           IconButton(
-            icon: const Icon(Icons.notifications_outlined),
+            icon: ShaderMask(
+              shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
+              child: const Icon(Icons.notifications_outlined, color: Colors.white),
+            ),
             onPressed: () {
-              // Navigate to notifications
+              context.push('/notifications');
             },
           ),
         ],
@@ -123,8 +144,13 @@ class _FeedScreenState extends State<FeedScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final confession = feedProvider.confessions[index];
+                        final currentUser = context.read<AuthProvider>().user;
+                        final isOwnPost = currentUser?.id == confession.authorId;
                         return ConfessionCard(
                           confession: confession,
+                          onTap: () {
+                            _navigateToConfessionDetail(confession.id);
+                          },
                           onLike: () {
                             if (confession.isLiked) {
                               feedProvider.unlikeConfession(confession.id);
@@ -138,8 +164,15 @@ class _FeedScreenState extends State<FeedScreen> {
                           onShare: () {
                             _shareConfession(confession.id);
                           },
-                          onPromote: () {
+                          // Only allow promoting own posts
+                          onPromote: isOwnPost ? () {
                             _showPromoteSheet(confession.id);
+                          } : null,
+                          onAuthorTap: () {
+                            if (confession.author != null &&
+                                confession.author!.username.isNotEmpty) {
+                              context.push('/u/${confession.author!.username}');
+                            }
                           },
                         );
                       },
@@ -151,10 +184,24 @@ class _FeedScreenState extends State<FeedScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreatePostSheet(),
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.edit, color: Colors.white),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          onPressed: () => _showCreatePostSheet(),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: const Icon(Icons.edit, color: Colors.white),
+        ),
       ),
     );
   }
@@ -179,7 +226,7 @@ class _FeedScreenState extends State<FeedScreen> {
   void _shareConfession(int confessionId) {
     final shareUrl = 'https://weylo.app/post/$confessionId';
     Share.share(
-      'Dcouvre cette publication sur Weylo! $shareUrl',
+      'Découvre cette publication sur Weylo! $shareUrl',
       subject: 'Publication Weylo',
     );
   }
@@ -263,7 +310,8 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
     try {
       await _confessionService.createConfession(
         content: content.isNotEmpty ? content : '',
-        type: _isPublic ? 'public' : 'anonymous',
+        type: 'public',
+        isAnonymous: !_isPublic,
         image: _selectedImage,
       );
 

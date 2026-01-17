@@ -96,6 +96,25 @@ class ChatService {
     return response.data['success'] ?? true;
   }
 
+  Future<ChatMessage> editMessage(
+    int conversationId,
+    int messageId, {
+    required String content,
+  }) async {
+    final response = await _apiClient.put(
+      '${ApiConstants.chatConversations}/$conversationId/messages/$messageId',
+      data: {'content': content},
+    );
+    return ChatMessage.fromJson(response.data['message'] ?? response.data);
+  }
+
+  Future<bool> deleteMessage(int conversationId, int messageId) async {
+    final response = await _apiClient.delete(
+      '${ApiConstants.chatConversations}/$conversationId/messages/$messageId',
+    );
+    return response.data['success'] ?? true;
+  }
+
   Future<UserStatus> getUserStatus(String username) async {
     final response = await _apiClient.get('${ApiConstants.chatUserStatus}/$username');
     return UserStatus.fromJson(response.data);

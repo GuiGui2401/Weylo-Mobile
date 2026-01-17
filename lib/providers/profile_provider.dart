@@ -74,10 +74,18 @@ class ProfileProvider extends ChangeNotifier {
     if (!_hasMoreConfessions && loadMore) return;
 
     try {
+      if (kDebugMode) print('ProfileProvider: Loading confessions for user $userId');
+
       final response = await _confessionService.getUserConfessions(
         userId,
         page: loadMore ? _confessionsPage : 1,
       );
+
+      if (kDebugMode) {
+        print('ProfileProvider: Loaded ${response.confessions.length} confessions');
+        print('ProfileProvider: Has more: ${response.hasMore}');
+        print('ProfileProvider: Page: ${response.currentPage}/${response.lastPage}');
+      }
 
       if (loadMore) {
         _userConfessions.addAll(response.confessions);
@@ -90,7 +98,10 @@ class ProfileProvider extends ChangeNotifier {
       _confessionsPage++;
       notifyListeners();
     } catch (e) {
-      if (kDebugMode) print('Error loading user confessions: $e');
+      if (kDebugMode) {
+        print('ProfileProvider: Error loading user confessions: $e');
+        print('ProfileProvider: Stack trace: ${StackTrace.current}');
+      }
     }
   }
 
@@ -114,7 +125,11 @@ class ProfileProvider extends ChangeNotifier {
       _likedPage++;
       notifyListeners();
     } catch (e) {
-      if (kDebugMode) print('Error loading liked confessions: $e');
+      // 404 errors are expected when there are no liked confessions yet
+      // Silently handle these cases without logging
+      if (!e.toString().contains('404')) {
+        if (kDebugMode) print('Error loading liked confessions: $e');
+      }
     }
   }
 

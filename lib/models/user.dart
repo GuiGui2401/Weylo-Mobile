@@ -18,6 +18,7 @@ class User {
   final String? bio;
   final double walletBalance;
   final bool isPremium;
+  final bool isVerified;
   final DateTime? premiumExpiresAt;
   final bool isBanned;
   final String role;
@@ -43,6 +44,7 @@ class User {
     this.bio,
     this.walletBalance = 0.0,
     this.isPremium = false,
+    this.isVerified = false,
     this.premiumExpiresAt,
     this.isBanned = false,
     this.role = 'user',
@@ -84,6 +86,7 @@ class User {
       bio: json['bio'],
       walletBalance: _parseDouble(json['wallet_balance'] ?? json['walletBalance']),
       isPremium: json['is_premium'] ?? json['isPremium'] ?? false,
+      isVerified: json['is_verified'] ?? json['isVerified'] ?? json['is_premium'] ?? json['isPremium'] ?? false,
       premiumExpiresAt: json['premium_expires_at'] != null
           ? DateTime.parse(json['premium_expires_at'])
           : null,
@@ -120,6 +123,7 @@ class User {
       'bio': bio,
       'wallet_balance': walletBalance,
       'is_premium': isPremium,
+      'is_verified': isVerified,
       'premium_expires_at': premiumExpiresAt?.toIso8601String(),
       'is_banned': isBanned,
       'role': role,
@@ -147,6 +151,7 @@ class User {
     String? bio,
     double? walletBalance,
     bool? isPremium,
+    bool? isVerified,
     DateTime? premiumExpiresAt,
     bool? isBanned,
     String? role,
@@ -170,6 +175,7 @@ class User {
       bio: bio ?? this.bio,
       walletBalance: walletBalance ?? this.walletBalance,
       isPremium: isPremium ?? this.isPremium,
+      isVerified: isVerified ?? this.isVerified,
       premiumExpiresAt: premiumExpiresAt ?? this.premiumExpiresAt,
       isBanned: isBanned ?? this.isBanned,
       role: role ?? this.role,
@@ -193,6 +199,8 @@ class UserSettings {
   final bool pushNotifications;
   final bool showOnlineStatus;
   final bool allowAnonymousMessages;
+  final bool showNameOnPosts;
+  final bool showPhotoOnPosts;
   final String language;
   final String theme;
 
@@ -202,6 +210,8 @@ class UserSettings {
     this.pushNotifications = true,
     this.showOnlineStatus = true,
     this.allowAnonymousMessages = true,
+    this.showNameOnPosts = true,
+    this.showPhotoOnPosts = true,
     this.language = 'fr',
     this.theme = 'system',
   });
@@ -213,6 +223,8 @@ class UserSettings {
       pushNotifications: json['push_notifications'] ?? true,
       showOnlineStatus: json['show_online_status'] ?? true,
       allowAnonymousMessages: json['allow_anonymous_messages'] ?? true,
+      showNameOnPosts: json['show_name_on_posts'] ?? true,
+      showPhotoOnPosts: json['show_photo_on_posts'] ?? true,
       language: json['language'] ?? 'fr',
       theme: json['theme'] ?? 'system',
     );
@@ -225,6 +237,8 @@ class UserSettings {
       'push_notifications': pushNotifications,
       'show_online_status': showOnlineStatus,
       'allow_anonymous_messages': allowAnonymousMessages,
+      'show_name_on_posts': showNameOnPosts,
+      'show_photo_on_posts': showPhotoOnPosts,
       'language': language,
       'theme': theme,
     };

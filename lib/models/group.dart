@@ -122,9 +122,10 @@ class GroupMessage {
   final int senderId;
   final String content;
   final String type;
-  final int? replyToId;
+  final String? mediaUrl;
+  final int? replyToMessageId;
   final User? sender;
-  final GroupMessage? replyTo;
+  final GroupMessage? replyToMessage;
   final DateTime createdAt;
 
   GroupMessage({
@@ -133,13 +134,17 @@ class GroupMessage {
     required this.senderId,
     required this.content,
     this.type = 'text',
-    this.replyToId,
+    this.mediaUrl,
+    this.replyToMessageId,
     this.sender,
-    this.replyTo,
+    this.replyToMessage,
     required this.createdAt,
   });
 
   bool get isSystem => type == 'system';
+  bool get hasImage => type == 'image' && mediaUrl != null;
+  bool get hasVoice => type == 'voice' && mediaUrl != null;
+  bool get hasVideo => type == 'video' && mediaUrl != null;
 
   factory GroupMessage.fromJson(Map<String, dynamic> json) {
     return GroupMessage(
@@ -148,10 +153,11 @@ class GroupMessage {
       senderId: json['sender_id'] ?? json['senderId'] ?? 0,
       content: json['content'] ?? '',
       type: json['type'] ?? 'text',
-      replyToId: json['reply_to_id'] ?? json['replyToId'],
+      mediaUrl: json['media_full_url'] ?? json['media_url'] ?? json['mediaUrl'],
+      replyToMessageId: json['reply_to_message_id'] ?? json['replyToMessageId'],
       sender: json['sender'] != null ? User.fromJson(json['sender']) : null,
-      replyTo: json['reply_to'] != null
-          ? GroupMessage.fromJson(json['reply_to'])
+      replyToMessage: json['reply_to_message'] != null
+          ? GroupMessage.fromJson(json['reply_to_message'])
           : null,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
@@ -166,7 +172,8 @@ class GroupMessage {
       'sender_id': senderId,
       'content': content,
       'type': type,
-      'reply_to_id': replyToId,
+      'media_url': mediaUrl,
+      'reply_to_message_id': replyToMessageId,
       'created_at': createdAt.toIso8601String(),
     };
   }

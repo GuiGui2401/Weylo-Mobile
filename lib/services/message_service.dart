@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart' as http_parser;
 import '../core/constants/api_constants.dart';
 import '../core/constants/app_constants.dart';
 import '../models/message.dart';
@@ -70,9 +71,37 @@ class MessageService {
     }
 
     if (voice != null) {
+      final filename = voice.path.split('/').last;
+      final extension = filename.split('.').last.toLowerCase();
+      String contentType = 'audio/m4a';
+
+      // Determine content type based on file extension
+      switch (extension) {
+        case 'mp3':
+          contentType = 'audio/mpeg';
+          break;
+        case 'm4a':
+        case 'aac':
+          contentType = 'audio/aac';
+          break;
+        case 'wav':
+          contentType = 'audio/wav';
+          break;
+        case 'ogg':
+          contentType = 'audio/ogg';
+          break;
+        case 'webm':
+          contentType = 'audio/webm';
+          break;
+      }
+
       formData.files.add(MapEntry(
         'voice',
-        await MultipartFile.fromFile(voice.path, filename: 'voice.m4a'),
+        await MultipartFile.fromFile(
+          voice.path,
+          filename: filename,
+          contentType: http_parser.MediaType.parse(contentType),
+        ),
       ));
     }
 

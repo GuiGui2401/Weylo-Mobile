@@ -230,9 +230,8 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.primary
-                          : Colors.grey[200],
+                      gradient: isSelected ? AppColors.primaryGradient : null,
+                      color: isSelected ? null : Colors.grey[200],
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Center(
@@ -296,10 +295,13 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                                 height: 48,
                               )
                             else
-                              const Icon(
-                                Icons.card_giftcard,
-                                size: 48,
-                                color: AppColors.primary,
+                              ShaderMask(
+                                shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
+                                child: const Icon(
+                                  Icons.card_giftcard,
+                                  size: 48,
+                                  color: Colors.white,
+                                ),
                               ),
                             const SizedBox(height: 4),
                             Text(
@@ -357,7 +359,7 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                         _isAnonymous = value ?? true;
                       });
                     },
-                    activeColor: AppColors.primary,
+                    activeColor: AppColors.secondary,
                   ),
                   const Text('Envoyer anonymement'),
                   const Spacer(),
@@ -373,38 +375,51 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                 ],
               ),
               const SizedBox(height: 12),
-              // Send button
-              SizedBox(
+              // Send button avec dégradé
+              Container(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _selectedGift != null && !_isSending
-                      ? _sendGift
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: _selectedGift != null && !_isSending ? AppColors.primaryGradient : null,
+                  color: _selectedGift != null && !_isSending ? null : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: _selectedGift != null && !_isSending
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
                       : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _selectedGift != null && !_isSending ? _sendGift : null,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Center(
+                      child: _isSending
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              _selectedGift != null
+                                  ? 'Envoyer ${_selectedGift!.name}'
+                                  : 'Sélectionnez un cadeau',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: _selectedGift != null ? Colors.white : Colors.grey,
+                              ),
+                            ),
                     ),
                   ),
-                  child: _isSending
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          _selectedGift != null
-                              ? 'Envoyer ${_selectedGift!.name}'
-                              : 'Sélectionnez un cadeau',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                 ),
               ),
             ],

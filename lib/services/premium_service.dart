@@ -57,9 +57,9 @@ class PremiumService {
   }
 
   // Premium Pass (global)
-  Future<PremiumPassStatus> getPassStatus() async {
+  Future<PremiumPassStatusResponse> getPassStatus() async {
     final response = await _apiClient.get(ApiConstants.premiumPassStatus);
-    return PremiumPassStatus.fromJson(response.data);
+    return PremiumPassStatusResponse.fromJson(response.data);
   }
 
   Future<PremiumPass> purchasePass() async {
@@ -96,21 +96,21 @@ class PremiumService {
   }
 }
 
-class PremiumPassStatus {
+class PremiumPassStatusResponse {
   final bool isActive;
   final PremiumPass? currentPass;
   final int daysRemaining;
   final bool autoRenew;
 
-  PremiumPassStatus({
+  PremiumPassStatusResponse({
     this.isActive = false,
     this.currentPass,
     this.daysRemaining = 0,
     this.autoRenew = false,
   });
 
-  factory PremiumPassStatus.fromJson(Map<String, dynamic> json) {
-    return PremiumPassStatus(
+  factory PremiumPassStatusResponse.fromJson(Map<String, dynamic> json) {
+    return PremiumPassStatusResponse(
       isActive: json['is_active'] ?? json['isActive'] ?? false,
       currentPass: json['current_pass'] != null
           ? PremiumPass.fromJson(json['current_pass'])

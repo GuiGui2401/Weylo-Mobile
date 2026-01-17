@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/user.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/gift_service.dart';
 import '../../widgets/confessions/confession_card.dart';
 import '../../widgets/common/loading_overlay.dart';
 import '../messages/send_message_screen.dart';
@@ -75,16 +77,22 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
+  Future<void> _onRefresh() async {
+    await context.read<ProfileProvider>().loadProfile(widget.username);
+  }
+
   Widget _buildProfileContent(
     User user,
     ProfileProvider provider,
     bool isOwnProfile,
   ) {
-    return NestedScrollView(
+    return RefreshIndicator(
+      onRefresh: _onRefresh,
+      child: NestedScrollView(
       headerSliverBuilder: (context, innerBoxIsScrolled) {
         return [
           SliverAppBar(
-            expandedHeight: 280,
+            expandedHeight: 380,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
               background: _buildProfileHeader(user, provider, isOwnProfile),
@@ -129,7 +137,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             delegate: _SliverTabBarDelegate(
               TabBar(
                 controller: _tabController,
-                labelColor: AppColors.primary,
+                labelColor: AppColors.secondary,
                 unselectedLabelColor: Colors.grey,
                 indicatorColor: AppColors.primary,
                 tabs: const [
@@ -148,6 +156,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           _buildGiftsTab(),
         ],
       ),
+    ),
     );
   }
 
@@ -157,15 +166,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     bool isOwnProfile,
   ) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.primary.withOpacity(0.8),
-            AppColors.primary.withOpacity(0.4),
-          ],
-        ),
+      decoration: const BoxDecoration(
+        gradient: AppColors.primaryGradient,
       ),
       child: SafeArea(
         child: Column(
@@ -175,63 +177,81 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             // Avatar
             Stack(
               children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.white,
-                  child: user.avatar != null
-                      ? ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: user.avatar!,
-                            width: 96,
-                            height: 96,
-                            fit: BoxFit.cover,
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.grey[200],
+                    child: user.avatar != null
+                        ? ClipOval(
+                            child: CachedNetworkImage(
+                              imageUrl: user.avatar!,
+                              width: 96,
+                              height: 96,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Text(
+                            user.initials,
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
                           ),
-                        )
-                      : Text(
-                          user.initials,
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
+                  ),
                 ),
-                if (user.isPremium)
+                // Badge vérifié bleu pour les utilisateurs premium/vérifiés
+                if (user.isPremium || user.isVerified)
                   Positioned(
                     bottom: 0,
                     right: 0,
                     child: Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(2),
                       decoration: const BoxDecoration(
-                        color: Colors.amber,
+                        color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.star,
-                        size: 16,
-                        color: Colors.white,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
               ],
             ),
             const SizedBox(height: 12),
-            // Name
+            // Name - Afficher "Anonyme" si l'utilisateur a choisi de ne pas montrer son nom
             Text(
-              user.fullName,
-              style: const TextStyle(
+              (user.settings?.showNameOnPosts ?? true) ? user.fullName : 'Anonyme',
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
+                fontStyle: (user.settings?.showNameOnPosts ?? true) ? FontStyle.normal : FontStyle.italic,
               ),
             ),
-            Text(
-              '@${user.username}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white.withOpacity(0.8),
+            // Afficher le username seulement si l'utilisateur est visible
+            if (user.settings?.showNameOnPosts ?? true)
+              Text(
+                '@${user.username}',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.8),
+                ),
               ),
-            ),
             if (user.bio != null && user.bio!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Padding(
@@ -322,54 +342,91 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Follow/Unfollow button
-        ElevatedButton(
-          onPressed: provider.isFollowLoading
-              ? null
-              : () {
-                  if (isFollowing) {
-                    provider.unfollowUser(user.username);
-                  } else {
-                    provider.followUser(user.username);
-                  }
-                },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: isFollowing ? Colors.white : AppColors.primary,
-            foregroundColor: isFollowing ? AppColors.primary : Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: isFollowing
-                  ? const BorderSide(color: AppColors.primary)
-                  : BorderSide.none,
+        // Follow/Unfollow button avec dégradé
+        Container(
+          decoration: BoxDecoration(
+            gradient: isFollowing ? null : AppColors.primaryGradient,
+            borderRadius: BorderRadius.circular(25),
+            border: isFollowing ? Border.all(color: Colors.white, width: 2) : null,
+          ),
+          child: Material(
+            color: isFollowing ? Colors.white.withOpacity(0.2) : Colors.transparent,
+            borderRadius: BorderRadius.circular(25),
+            child: InkWell(
+              onTap: provider.isFollowLoading
+                  ? null
+                  : () {
+                      if (isFollowing) {
+                        provider.unfollowUser(user.username);
+                      } else {
+                        provider.followUser(user.username);
+                      }
+                    },
+              borderRadius: BorderRadius.circular(25),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                child: provider.isFollowLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isFollowing ? Icons.check : Icons.person_add,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isFollowing ? 'Abonné' : 'Suivre',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
             ),
           ),
-          child: provider.isFollowLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(isFollowing ? 'Abonné' : 'Suivre'),
         ),
         const SizedBox(width: 12),
         // Message button
-        OutlinedButton(
-          onPressed: () => _sendMessage(user),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.white,
-            side: const BorderSide(color: Colors.white),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: Colors.white, width: 2),
           ),
-          child: const Row(
-            children: [
-              Icon(Icons.mail_outline, size: 18),
-              SizedBox(width: 4),
-              Text('Message'),
-            ],
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(25),
+            child: InkWell(
+              onTap: () => _sendMessage(user),
+              borderRadius: BorderRadius.circular(25),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.mail_outline, size: 18, color: Colors.white),
+                    SizedBox(width: 6),
+                    Text(
+                      'Message',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -402,26 +459,19 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         final confession = confessions[index];
         return ConfessionCard(
           confession: confession,
+          onTap: () {
+            context.push('/confessions/${confession.id}');
+          },
+          onComment: () {
+            context.push('/confessions/${confession.id}');
+          },
         );
       },
     );
   }
 
   Widget _buildGiftsTab() {
-    // TODO: Implement gifts received display
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.card_giftcard_outlined, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
-            'Aucun cadeau reçu',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ],
-      ),
-    );
+    return _GiftsTabView(username: widget.username);
   }
 
   void _showFollowersList() {
@@ -476,5 +526,184 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_SliverTabBarDelegate oldDelegate) {
     return false;
+  }
+}
+
+class _GiftsTabView extends StatefulWidget {
+  final String username;
+
+  const _GiftsTabView({required this.username});
+
+  @override
+  State<_GiftsTabView> createState() => _GiftsTabViewState();
+}
+
+class _GiftsTabViewState extends State<_GiftsTabView> {
+  List<dynamic>? _gifts;
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGifts();
+  }
+
+  Future<void> _loadGifts() async {
+    // Only show gifts for the current user's own profile
+    final currentUser = context.read<AuthProvider>().user;
+    if (currentUser?.username != widget.username) {
+      setState(() {
+        _isLoading = false;
+        _error = 'private';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final giftService = GiftService();
+      final gifts = await giftService.getReceivedGifts();
+      setState(() {
+        _gifts = gifts;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading gifts: $e');
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error == 'private') {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.lock_outline, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Les cadeaux sont privés',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              'Erreur lors du chargement',
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadGifts,
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_gifts == null || _gifts!.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.card_giftcard_outlined, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Aucun cadeau reçu',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.75,
+      ),
+      itemCount: _gifts!.length,
+      itemBuilder: (context, index) {
+        final giftTransaction = _gifts![index];
+        final gift = giftTransaction.gift;
+        final sender = giftTransaction.sender;
+
+        return Card(
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (gift?.icon != null && gift!.icon.isNotEmpty)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: CachedNetworkImage(
+                      imageUrl: gift.icon,
+                      fit: BoxFit.contain,
+                      placeholder: (context, url) =>
+                          const CircularProgressIndicator(),
+                      errorWidget: (context, url, error) =>
+                          const Icon(Icons.card_giftcard, size: 40),
+                    ),
+                  ),
+                )
+              else
+                const Expanded(
+                  child: Icon(Icons.card_giftcard, size: 40),
+                ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: Text(
+                  gift?.name ?? 'Cadeau',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              if (sender != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+                  child: Text(
+                    'de ${sender.username}',
+                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              const SizedBox(height: 4),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

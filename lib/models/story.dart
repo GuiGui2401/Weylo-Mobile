@@ -122,15 +122,48 @@ class StoryView {
   }
 }
 
+class StoryPreview {
+  final String type;
+  final String? mediaUrl;
+  final String? content;
+  final String? backgroundColor;
+
+  StoryPreview({
+    required this.type,
+    this.mediaUrl,
+    this.content,
+    this.backgroundColor,
+  });
+
+  factory StoryPreview.fromJson(Map<String, dynamic> json) {
+    return StoryPreview(
+      type: json['type'] ?? 'text',
+      mediaUrl: json['media_url'] ?? json['mediaUrl'],
+      content: json['content'],
+      backgroundColor: json['background_color'] ?? json['backgroundColor'],
+    );
+  }
+}
+
 class UserStories {
   final User user;
+  final int realUserId; // L'ID réel de l'utilisateur (même si anonyme)
   final List<Story> stories;
   final bool hasUnviewed;
+  final bool isAnonymous;
+  final int storiesCount;
+  final DateTime? latestStoryAt;
+  final StoryPreview? preview;
 
   UserStories({
     required this.user,
+    required this.realUserId,
     required this.stories,
     this.hasUnviewed = false,
+    this.isAnonymous = false,
+    this.storiesCount = 0,
+    this.latestStoryAt,
+    this.preview,
   });
 
   factory UserStories.fromJson(Map<String, dynamic> json) {
@@ -140,10 +173,40 @@ class UserStories {
       stories = storiesData.map((s) => Story.fromJson(s)).toList();
     }
 
+    // Parse user data
+    final userData = json['user'];
+    User user;
+    if (userData != null) {
+      user = User.fromJson(userData);
+    } else {
+      // Créer un utilisateur par défaut si les données sont manquantes
+      user = User(
+        id: json['real_user_id'] ?? 0,
+        firstName: 'Utilisateur',
+        username: 'anonyme',
+      );
+    }
+
+    // Utiliser real_user_id si disponible, sinon user.id
+    final realUserId = json['real_user_id'] ?? json['realUserId'] ?? userData?['id'] ?? 0;
+
+    // Parse preview
+    StoryPreview? preview;
+    if (json['preview'] != null) {
+      preview = StoryPreview.fromJson(json['preview']);
+    }
+
     return UserStories(
-      user: User.fromJson(json['user']),
+      user: user,
+      realUserId: realUserId is int ? realUserId : int.tryParse(realUserId.toString()) ?? 0,
       stories: stories,
-      hasUnviewed: json['has_unviewed'] ?? json['hasUnviewed'] ?? false,
+      hasUnviewed: json['has_new'] ?? json['has_unviewed'] ?? json['hasUnviewed'] ?? !(json['all_viewed'] ?? true),
+      isAnonymous: json['is_anonymous'] ?? json['isAnonymous'] ?? false,
+      storiesCount: json['stories_count'] ?? json['storiesCount'] ?? stories.length,
+      latestStoryAt: json['latest_story_at'] != null
+          ? DateTime.parse(json['latest_story_at'])
+          : null,
+      preview: preview,
     );
   }
 }
@@ -165,5 +228,47 @@ class StoryStats {
       totalViews: json['total_views'] ?? json['totalViews'] ?? 0,
       activeStories: json['active_stories'] ?? json['activeStories'] ?? 0,
     );
+  }
+}
+
+class StoryComment {
+  final int id;
+  final String content;
+  final int likesCount;
+  final User? user;
+  final List<StoryComment>? replies;
+  final DateTime createdAt;
+
+  StoryComment({
+    required this.id,
+    required this.content,
+    this.likesCount = 0,
+    this.user,
+    this.replies,
+    required this.createdAt,
+  });
+
+  factory StoryComment.fromJson(Map<String, dynamic> json) {
+    return StoryComment(
+      id: json['id'] ?? 0,
+      content: json['content'] ?? '',
+      likesCount: json['likes_count'] ?? json['likesCount'] ?? 0,
+      user: json['user'] != null ? User.fromJson(json['user']) : null,
+      replies: json['replies'] != null && json['replies'] is List
+          ? (json['replies'] as List).map((r) => StoryComment.fromJson(r)).toList()
+          : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'content': content,
+      'likes_count': likesCount,
+      'created_at': createdAt.toIso8601String(),
+    };
   }
 }

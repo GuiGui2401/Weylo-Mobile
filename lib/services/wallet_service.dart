@@ -67,7 +67,7 @@ class WalletService {
 
   Future<DepositInitResponse> initiateDeposit({
     required double amount,
-    String provider = 'cinetpay',
+    String provider = 'ligos',
   }) async {
     final response = await _apiClient.post(
       ApiConstants.walletDeposit,

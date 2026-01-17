@@ -58,22 +58,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const SizedBox(height: 40),
                       // Logo
-                      Container(
-                        height: 100,
-                        width: 100,
-                        decoration: BoxDecoration(
-                          gradient: AppColors.primaryGradient,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'W',
-                            style: TextStyle(
-                              fontSize: 48,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
+                      Center(
+                        child: Image.asset(
+                          'assets/logo.PNG',
+                          height: 120,
+                          width: 120,
+                          fit: BoxFit.contain,
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -132,12 +122,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      // Password field
+                      // Code PIN field
                       CustomTextField(
                         controller: _passwordController,
-                        label: 'Mot de passe',
-                        hintText: 'Entrez votre mot de passe',
+                        label: 'Code PIN',
+                        hintText: 'Entrez votre code à 4 chiffres',
                         prefixIcon: Icons.lock_outline,
+                        keyboardType: TextInputType.number,
+                        maxLength: 4,
                         obscureText: _obscurePassword,
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => _handleLogin(),
@@ -155,18 +147,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Veuillez entrer votre mot de passe';
+                            return 'Veuillez entrer votre code PIN';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 12),
-                      // Forgot password
+                      // Forgot PIN
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () => context.push('/forgot-password'),
-                          child: const Text('Mot de passe oublié ?'),
+                          child: const Text('Code oublié ?'),
                         ),
                       ),
                       const SizedBox(height: 24),

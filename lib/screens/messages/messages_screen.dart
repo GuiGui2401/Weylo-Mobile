@@ -109,7 +109,7 @@ class _MessagesScreenState extends State<MessagesScreen> with SingleTickerProvid
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
+                        gradient: AppColors.primaryGradient,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -140,9 +140,24 @@ class _MessagesScreenState extends State<MessagesScreen> with SingleTickerProvid
                     _buildMessagesList(_sentMessages, isReceived: false),
                   ],
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/send-message'),
-        child: const Icon(Icons.edit),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          onPressed: () => context.push('/send-message'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: const Icon(Icons.edit, color: Colors.white),
+        ),
       ),
     );
   }

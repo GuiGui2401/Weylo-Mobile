@@ -9,3 +9,4 @@ export 'story.dart';
 export 'wallet.dart';
 export 'premium.dart';
 export 'notification.dart';
+export 'monetization.dart';

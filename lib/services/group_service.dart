@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart' as http_parser;
 import '../core/constants/api_constants.dart';
 import '../core/constants/app_constants.dart';
 import '../models/group.dart';
@@ -31,7 +34,27 @@ class GroupService {
     String? description,
     bool isPublic = false,
     int maxMembers = AppConstants.maxGroupMembers,
+    File? avatar,
   }) async {
+    if (avatar != null) {
+      // Utiliser FormData si on a une image
+      final formData = FormData.fromMap({
+        'name': name,
+        if (description != null) 'description': description,
+        'is_public': isPublic ? '1' : '0',
+        'max_members': maxMembers.toString(),
+        'avatar': await MultipartFile.fromFile(
+          avatar.path,
+          filename: 'avatar.jpg',
+        ),
+      });
+      final response = await _apiClient.post(
+        ApiConstants.groups,
+        data: formData,
+      );
+      return Group.fromJson(response.data['group'] ?? response.data);
+    }
+
     final response = await _apiClient.post(
       ApiConstants.groups,
       data: {
@@ -92,16 +115,74 @@ class GroupService {
     return PaginatedGroupMessages.fromJson(response.data);
   }
 
-  Future<GroupMessage> sendMessage(
-    int groupId, {
-    required String content,
+  Future<GroupMessage> sendMessage({
+    required int groupId,
+    String? content,
     int? replyToId,
+    dynamic image,
+    dynamic voice,
   }) async {
-    final data = <String, dynamic>{
-      'content': content,
-    };
+    // If there's media, use multipart form data
+    if (image != null || voice != null) {
+      final formData = <String, dynamic>{};
+      if (content != null && content.isNotEmpty) {
+        formData['content'] = content;
+      }
+      if (replyToId != null) {
+        formData['reply_to_message_id'] = replyToId;
+      }
+      if (image != null) {
+        formData['image'] = await MultipartFile.fromFile(
+          image.path,
+          filename: image.path.split('/').last,
+        );
+      }
+      if (voice != null) {
+        final filename = voice.path.split('/').last;
+        final extension = filename.split('.').last.toLowerCase();
+        String contentType = 'audio/m4a';
+
+        // Determine content type based on file extension
+        switch (extension) {
+          case 'mp3':
+            contentType = 'audio/mpeg';
+            break;
+          case 'm4a':
+          case 'aac':
+            contentType = 'audio/aac';
+            break;
+          case 'wav':
+            contentType = 'audio/wav';
+            break;
+          case 'ogg':
+            contentType = 'audio/ogg';
+            break;
+          case 'webm':
+            contentType = 'audio/webm';
+            break;
+        }
+
+        formData['voice'] = await MultipartFile.fromFile(
+          voice.path,
+          filename: filename,
+          contentType: http_parser.MediaType.parse(contentType),
+        );
+      }
+
+      final response = await _apiClient.uploadFile(
+        '${ApiConstants.groups}/$groupId/messages',
+        data: FormData.fromMap(formData),
+      );
+      return GroupMessage.fromJson(response.data['message'] ?? response.data);
+    }
+
+    // No media, use regular JSON
+    final data = <String, dynamic>{};
+    if (content != null && content.isNotEmpty) {
+      data['content'] = content;
+    }
     if (replyToId != null) {
-      data['reply_to_id'] = replyToId;
+      data['reply_to_message_id'] = replyToId;
     }
 
     final response = await _apiClient.post(
@@ -113,6 +194,25 @@ class GroupService {
 
   Future<bool> markAsRead(int groupId) async {
     final response = await _apiClient.post('${ApiConstants.groups}/$groupId/read');
+    return response.data['success'] ?? true;
+  }
+
+  Future<GroupMessage> editMessage(
+    int groupId,
+    int messageId, {
+    required String content,
+  }) async {
+    final response = await _apiClient.put(
+      '${ApiConstants.groups}/$groupId/messages/$messageId',
+      data: {'content': content},
+    );
+    return GroupMessage.fromJson(response.data['message'] ?? response.data);
+  }
+
+  Future<bool> deleteMessage(int groupId, int messageId) async {
+    final response = await _apiClient.delete(
+      '${ApiConstants.groups}/$groupId/messages/$messageId',
+    );
     return response.data['success'] ?? true;
   }
 

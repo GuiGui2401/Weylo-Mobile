@@ -330,8 +330,8 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(width: 8),
           Container(
-            decoration: BoxDecoration(
-              color: AppColors.primary,
+            decoration: const BoxDecoration(
+              gradient: AppColors.primaryGradient,
               shape: BoxShape.circle,
             ),
             child: IconButton(
@@ -471,7 +471,8 @@ class _MessageBubble extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isMe ? AppColors.primary : AppColors.messageReceived,
+                  gradient: isMe ? AppColors.primaryGradient : null,
+                  color: isMe ? null : AppColors.messageReceived,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(20),
                     topRight: const Radius.circular(20),

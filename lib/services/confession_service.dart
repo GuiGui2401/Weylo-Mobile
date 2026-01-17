@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart' as http_parser;
 import '../core/constants/api_constants.dart';
 import '../core/constants/app_constants.dart';
 import '../models/confession.dart';
@@ -78,23 +79,86 @@ class ConfessionService {
   }
 
   Future<Confession> createConfession({
-    required String content,
+    String? content,
     String type = 'public',
     String? recipientUsername,
     File? image,
+    File? video,
+    bool isAnonymous = false,
   }) async {
-    // If there's an image, use multipart form data
-    if (image != null) {
-      final formData = FormData.fromMap({
-        'content': content,
-        'type': type,
-        if (recipientUsername != null) 'recipient_username': recipientUsername,
-        'image': await MultipartFile.fromFile(
-          image.path,
-          filename: image.path.split('/').last,
-        ),
-      });
+    // If there's media, use multipart form data
+    if (image != null || video != null) {
+      final Map<String, dynamic> formDataMap = {};
 
+      if (content != null && content.isNotEmpty) {
+        formDataMap['content'] = content;
+      }
+      formDataMap['type'] = type;
+      formDataMap['is_anonymous'] = isAnonymous ? '1' : '0';
+
+      if (recipientUsername != null) {
+        formDataMap['recipient_username'] = recipientUsername;
+      }
+
+      if (image != null) {
+        final filename = image.path.split('/').last;
+        final extension = filename.split('.').last.toLowerCase();
+        String contentType = 'image/jpeg';
+
+        switch (extension) {
+          case 'png':
+            contentType = 'image/png';
+            break;
+          case 'gif':
+            contentType = 'image/gif';
+            break;
+          case 'webp':
+            contentType = 'image/webp';
+            break;
+          case 'jpg':
+          case 'jpeg':
+            contentType = 'image/jpeg';
+            break;
+        }
+
+        formDataMap['image'] = await MultipartFile.fromFile(
+          image.path,
+          filename: filename,
+          contentType: http_parser.MediaType.parse(contentType),
+        );
+      }
+
+      if (video != null) {
+        final filename = video.path.split('/').last;
+        final extension = filename.split('.').last.toLowerCase();
+        String contentType = 'video/mp4';
+
+        switch (extension) {
+          case 'mp4':
+            contentType = 'video/mp4';
+            break;
+          case 'mov':
+            contentType = 'video/quicktime';
+            break;
+          case 'avi':
+            contentType = 'video/x-msvideo';
+            break;
+          case 'mkv':
+            contentType = 'video/x-matroska';
+            break;
+          case 'webm':
+            contentType = 'video/webm';
+            break;
+        }
+
+        formDataMap['video'] = await MultipartFile.fromFile(
+          video.path,
+          filename: filename,
+          contentType: http_parser.MediaType.parse(contentType),
+        );
+      }
+
+      final formData = FormData.fromMap(formDataMap);
       final response = await _apiClient.uploadFile(
         ApiConstants.confessions,
         data: formData,
@@ -102,11 +166,16 @@ class ConfessionService {
       return Confession.fromJson(response.data['confession'] ?? response.data);
     }
 
-    // No image, use regular JSON
+    // No media, use regular JSON
     final data = <String, dynamic>{
-      'content': content,
       'type': type,
+      'is_anonymous': isAnonymous,
     };
+
+    if (content != null && content.isNotEmpty) {
+      data['content'] = content;
+    }
+
     if (recipientUsername != null) {
       data['recipient_username'] = recipientUsername;
     }
@@ -170,6 +239,20 @@ class ConfessionService {
   Future<ConfessionStats> getStats() async {
     final response = await _apiClient.get(ApiConstants.confessionsStats);
     return ConfessionStats.fromJson(response.data);
+  }
+
+  Future<List<Confession>> searchConfessions(String query) async {
+    try {
+      final response = await _apiClient.get(
+        '${ApiConstants.confessions}/search',
+        queryParameters: {'q': query},
+      );
+      final data = response.data['confessions'] ?? response.data['data'] ?? [];
+      return (data as List).map((c) => Confession.fromJson(c)).toList();
+    } catch (e) {
+      // If search endpoint doesn't exist, return empty list
+      return [];
+    }
   }
 }
 

@@ -30,6 +30,14 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     Colors.indigo,
     Colors.red,
     Colors.green,
+    Colors.blue,
+    Colors.deepOrange,
+    Colors.cyan,
+    Colors.amber,
+    const Color(0xFF1a1a2e), // Dark blue
+    const Color(0xFF16213e), // Navy
+    const Color(0xFF0f3460), // Deep blue
+    const Color(0xFFe94560), // Coral
   ];
 
   @override
@@ -121,10 +129,31 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
       setState(() {
         _isUploading = false;
       });
+
+      // Detailed error logging for debugging
+      debugPrint('=== Story Upload Error ===');
+      debugPrint('Error type: ${e.runtimeType}');
+      debugPrint('Error message: ${e.toString()}');
+      debugPrint('Media path: ${_selectedMedia?.path}');
+      debugPrint('Is video: $_isVideo');
+      debugPrint('Has text: ${_textController.text.isNotEmpty}');
+      debugPrint('==========================');
+
+      // Show user-friendly error message
+      String errorMessage = 'Erreur lors de la publication';
+      if (e.toString().contains('DioException')) {
+        errorMessage = 'Erreur de connexion. Vérifiez votre internet.';
+      } else if (e.toString().contains('type')) {
+        errorMessage = 'Format de fichier non supporté';
+      } else if (e.toString().contains('size')) {
+        errorMessage = 'Fichier trop volumineux';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur: ${e.toString()}'),
+          content: Text('$errorMessage\n${e.toString()}'),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
         ),
       );
     }
@@ -191,17 +220,27 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                   padding: const EdgeInsets.all(32),
                   child: TextField(
                     controller: _textController,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    cursorColor: _getContrastColor(_backgroundColor),
+                    style: TextStyle(
+                      color: _getContrastColor(_backgroundColor),
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
+                      shadows: [
+                        Shadow(
+                          offset: const Offset(1, 1),
+                          blurRadius: 3,
+                          color: _backgroundColor.computeLuminance() > 0.5
+                              ? Colors.black38
+                              : Colors.white38,
+                        ),
+                      ],
                     ),
                     textAlign: TextAlign.center,
                     maxLines: null,
-                    decoration: const InputDecoration(
-                      hintText: 'crivez quelque chose...',
+                    decoration: InputDecoration(
+                      hintText: 'Écrivez quelque chose...',
                       hintStyle: TextStyle(
-                        color: Colors.white70,
+                        color: _getContrastColor(_backgroundColor).withOpacity(0.6),
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
                       ),
@@ -334,6 +373,14 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
         ],
       ),
     );
+  }
+
+  /// Retourne la couleur de contraste (blanc ou noir) selon la luminosité du fond
+  Color _getContrastColor(Color backgroundColor) {
+    // Calcule la luminosité relative du fond
+    final luminance = backgroundColor.computeLuminance();
+    // Si le fond est clair, utiliser du texte foncé, sinon du texte clair
+    return luminance > 0.5 ? Colors.black : Colors.white;
   }
 
   Widget _buildMediaButton({

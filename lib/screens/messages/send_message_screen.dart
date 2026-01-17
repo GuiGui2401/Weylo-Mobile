@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/message_service.dart';
+import '../../services/user_service.dart';
 import '../../widgets/voice/voice_recorder_widget.dart';
 import '../../services/voice_effects_service.dart';
 
@@ -57,9 +58,17 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
       return;
     }
     setState(() => _isSearching = true);
-    // TODO: Implement user search API
-    await Future.delayed(const Duration(milliseconds: 500));
-    setState(() => _isSearching = false);
+    try {
+      final userService = UserService();
+      final users = await userService.searchUsers(query);
+      setState(() {
+        _searchResults = users;
+        _isSearching = false;
+      });
+    } catch (e) {
+      debugPrint('Error searching users: $e');
+      setState(() => _isSearching = false);
+    }
   }
 
   Future<void> _pickImage() async {

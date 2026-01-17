@@ -230,9 +230,30 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Déposer de l\'argent',
+              'Deposer de l\'argent',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.payment, color: AppColors.success, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Paiement via Ligos',
+                    style: TextStyle(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 24),
@@ -260,7 +281,10 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
                 }
 
                 try {
-                  final response = await _walletService.initiateDeposit(amount: amount);
+                  final response = await _walletService.initiateDeposit(
+                    amount: amount,
+                    provider: 'ligos',
+                  );
                   if (mounted) {
                     Navigator.pop(context);
                     // Open payment URL
@@ -270,7 +294,7 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
                   Helpers.showErrorSnackBar(context, 'Erreur lors de l\'initialisation');
                 }
               },
-              child: const Text('Continuer vers le paiement'),
+              child: const Text('Continuer vers Ligos'),
             ),
           ],
         ),
@@ -304,6 +328,27 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.account_balance_wallet, color: AppColors.warning, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Retrait via Cinetpay',
+                      style: TextStyle(
+                        color: AppColors.warning,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 24),
               TextField(
                 controller: amountController,
@@ -318,7 +363,7 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
               DropdownButtonFormField<String>(
                 value: selectedProvider,
                 decoration: const InputDecoration(
-                  labelText: 'Méthode de retrait',
+                  labelText: 'Methode de retrait',
                   prefixIcon: Icon(Icons.account_balance),
                 ),
                 items: const [
@@ -336,7 +381,7 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
                 controller: phoneController,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
-                  labelText: 'Numéro de téléphone',
+                  labelText: 'Numero de telephone',
                   hintText: '6XXXXXXXX',
                   prefixIcon: Icon(Icons.phone),
                 ),
@@ -356,19 +401,19 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
                   }
 
                   if (phoneController.text.isEmpty) {
-                    Helpers.showErrorSnackBar(context, 'Veuillez entrer un numéro de téléphone');
+                    Helpers.showErrorSnackBar(context, 'Veuillez entrer un numero de telephone');
                     return;
                   }
 
                   try {
                     await _walletService.requestWithdrawal(
                       amount: amount,
-                      provider: selectedProvider,
+                      provider: 'cinetpay_$selectedProvider',
                       phoneNumber: phoneController.text,
                     );
                     if (mounted) {
                       Navigator.pop(context);
-                      Helpers.showSuccessSnackBar(context, 'Demande de retrait envoyée');
+                      Helpers.showSuccessSnackBar(context, 'Demande de retrait envoyee');
                       _loadData();
                     }
                   } catch (e) {

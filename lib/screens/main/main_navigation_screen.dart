@@ -6,6 +6,7 @@ import '../../services/pusher_service.dart';
 import '../feed/feed_screen.dart';
 import '../messages/messages_screen.dart';
 import '../chat/conversations_screen.dart';
+import '../groups/groups_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../profile/my_profile_screen.dart';
 
@@ -24,6 +25,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const FeedScreen(),
     const MessagesScreen(),
     const ConversationsScreen(),
+    const GroupsScreen(),
     const WalletScreen(),
     const MyProfileScreen(),
   ];
@@ -61,7 +63,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           color: Theme.of(context).scaffoldBackgroundColor,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -69,40 +71,58 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(
-                  index: 0,
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home,
-                  label: 'Feed',
+                Expanded(
+                  child: _buildNavItem(
+                    index: 0,
+                    icon: Icons.home_outlined,
+                    activeIcon: Icons.home,
+                    label: 'Feed',
+                  ),
                 ),
-                _buildNavItem(
-                  index: 1,
-                  icon: Icons.mail_outline,
-                  activeIcon: Icons.mail,
-                  label: 'Messages',
-                  showBadge: true,
+                Expanded(
+                  child: _buildNavItem(
+                    index: 1,
+                    icon: Icons.mail_outline,
+                    activeIcon: Icons.mail,
+                    label: 'Messages',
+                    showBadge: true,
+                  ),
                 ),
-                _buildNavItem(
-                  index: 2,
-                  icon: Icons.chat_bubble_outline,
-                  activeIcon: Icons.chat_bubble,
-                  label: 'Chat',
+                Expanded(
+                  child: _buildNavItem(
+                    index: 2,
+                    icon: Icons.chat_bubble_outline,
+                    activeIcon: Icons.chat_bubble,
+                    label: 'Chat',
+                  ),
                 ),
-                _buildNavItem(
-                  index: 3,
-                  icon: Icons.account_balance_wallet_outlined,
-                  activeIcon: Icons.account_balance_wallet,
-                  label: 'Wallet',
+                Expanded(
+                  child: _buildNavItem(
+                    index: 3,
+                    icon: Icons.groups_outlined,
+                    activeIcon: Icons.groups,
+                    label: 'Groupes',
+                  ),
                 ),
-                _buildNavItem(
-                  index: 4,
-                  icon: Icons.person_outline,
-                  activeIcon: Icons.person,
-                  label: 'Profil',
+                Expanded(
+                  child: _buildNavItem(
+                    index: 4,
+                    icon: Icons.account_balance_wallet_outlined,
+                    activeIcon: Icons.account_balance_wallet,
+                    label: 'Wallet',
+                  ),
+                ),
+                Expanded(
+                  child: _buildNavItem(
+                    index: 5,
+                    icon: Icons.person_outline,
+                    activeIcon: Icons.person,
+                    label: 'Profil',
+                  ),
                 ),
               ],
             ),
@@ -128,24 +148,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         });
       },
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary.withOpacity(0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               children: [
-                Icon(
-                  isSelected ? activeIcon : icon,
-                  color: isSelected ? AppColors.primary : Colors.grey,
-                  size: 24,
+                // Icône avec dégradé si sélectionnée
+                ShaderMask(
+                  shaderCallback: (Rect bounds) {
+                    if (isSelected) {
+                      return AppColors.primaryGradient.createShader(bounds);
+                    }
+                    return LinearGradient(
+                      colors: [AppColors.textSecondary, AppColors.textSecondary],
+                    ).createShader(bounds);
+                  },
+                  child: Icon(
+                    isSelected ? activeIcon : icon,
+                    color: Colors.white,
+                    size: 26,
+                    weight: 700, // Make icons bolder
+                  ),
                 ),
                 if (showBadge)
                   Positioned(
@@ -153,13 +178,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     top: 0,
                     child: Consumer<AuthProvider>(
                       builder: (context, auth, _) {
-                        // Show badge for unread messages
                         return Container(
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: AppColors.primary,
+                            gradient: AppColors.primaryGradient,
                             shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(context).scaffoldBackgroundColor,
+                              width: 1,
+                            ),
                           ),
                         );
                       },
@@ -168,12 +196,25 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ],
             ),
             const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? AppColors.primary : Colors.grey,
+            // Texte avec dégradé si sélectionné
+            ShaderMask(
+              shaderCallback: (Rect bounds) {
+                if (isSelected) {
+                  return AppColors.primaryGradient.createShader(bounds);
+                }
+                return LinearGradient(
+                  colors: [AppColors.textSecondary, AppColors.textSecondary],
+                ).createShader(bounds);
+              },
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: Colors.white,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
           ],

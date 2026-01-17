@@ -10,9 +10,12 @@ class Confession {
   final String content;
   final String? image;
   final String? imageUrl;
+  final String? video;
+  final String? videoUrl;
   final ConfessionType type;
   final ConfessionStatus status;
   final bool isIdentityRevealed;
+  final bool isAnonymous;
   final int likesCount;
   final int viewsCount;
   final int commentsCount;
@@ -30,9 +33,12 @@ class Confession {
     required this.content,
     this.image,
     this.imageUrl,
+    this.video,
+    this.videoUrl,
     this.type = ConfessionType.public,
     this.status = ConfessionStatus.pending,
     this.isIdentityRevealed = false,
+    this.isAnonymous = false,
     this.likesCount = 0,
     this.viewsCount = 0,
     this.commentsCount = 0,
@@ -45,9 +51,15 @@ class Confession {
   });
 
   bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
+  bool get hasVideo => videoUrl != null && videoUrl!.isNotEmpty;
+  bool get hasMedia => hasImage || hasVideo;
 
   bool get isPublic => type == ConfessionType.public;
   bool get isApproved => status == ConfessionStatus.approved;
+
+  /// Détermine si l'auteur doit être affiché
+  /// L'auteur est visible si: post public ET non anonyme, OU identité révélée
+  bool get shouldShowAuthor => (isPublic && !isAnonymous) || isIdentityRevealed;
 
   String get authorInitials {
     if (author != null) {
@@ -64,9 +76,12 @@ class Confession {
       content: json['content'] ?? '',
       image: json['image'],
       imageUrl: json['image_url'] ?? json['imageUrl'],
+      video: json['video'],
+      videoUrl: json['video_url'] ?? json['videoUrl'],
       type: json['type'] == 'private' ? ConfessionType.private : ConfessionType.public,
       status: _parseStatus(json['status']),
       isIdentityRevealed: json['is_identity_revealed'] ?? json['isIdentityRevealed'] ?? false,
+      isAnonymous: json['is_anonymous'] ?? json['isAnonymous'] ?? false,
       likesCount: json['likes_count'] ?? json['likesCount'] ?? 0,
       viewsCount: json['views_count'] ?? json['viewsCount'] ?? 0,
       commentsCount: json['comments_count'] ?? json['commentsCount'] ?? 0,
@@ -104,9 +119,12 @@ class Confession {
       'content': content,
       'image': image,
       'image_url': imageUrl,
+      'video': video,
+      'video_url': videoUrl,
       'type': type == ConfessionType.private ? 'private' : 'public',
       'status': status.name,
       'is_identity_revealed': isIdentityRevealed,
+      'is_anonymous': isAnonymous,
       'likes_count': likesCount,
       'views_count': viewsCount,
       'comments_count': commentsCount,
@@ -121,6 +139,8 @@ class Confession {
     int? commentsCount,
     bool? isIdentityRevealed,
     String? imageUrl,
+    String? videoUrl,
+    User? author,
   }) {
     return Confession(
       id: id,
@@ -129,14 +149,17 @@ class Confession {
       content: content,
       image: image,
       imageUrl: imageUrl ?? this.imageUrl,
+      video: video,
+      videoUrl: videoUrl ?? this.videoUrl,
       type: type,
       status: status,
       isIdentityRevealed: isIdentityRevealed ?? this.isIdentityRevealed,
+      isAnonymous: isAnonymous,
       likesCount: likesCount ?? this.likesCount,
       viewsCount: viewsCount,
       commentsCount: commentsCount ?? this.commentsCount,
       isLiked: isLiked ?? this.isLiked,
-      author: author,
+      author: author ?? this.author,
       recipient: recipient,
       comments: comments,
       createdAt: createdAt,

@@ -1,15 +1,19 @@
 class ApiConstants {
   // static const String baseUrl = 'https://weylo-adminpanel.space/api/v1'; // Production
   // static const String wsUrl = 'wss://weylo-adminpanel.space'; // Production
-  static const String baseUrl = 'http://10.0.2.2:8000/api/v1'; // Local Development (Android Emulator)
-  static const String wsUrl = 'wss://10.0.2.2:8000'; // Local Development (Android Emulator)
+  //static const String baseUrl = 'http://10.0.2.2:8000/api/v1'; // Local Development (Android Emulator)
+  //static const String wsUrl = 'wss://10.0.2.2:8000'; // Local Development (Android Emulator)
+
+  static const String baseUrl ='http://192.168.1.177:8000/api/v1'; // Local Development (Physical Device)
+  static const String wsUrl ='ws://192.168.1.177:8000'; // Local Development (Physical Device)
 
   // Reverb/Pusher Configuration
   // static const String reverbHost = 'weylo-adminpanel.space'; // Production
   // static const int reverbPort = 443; // Production
   // static const String reverbAppKey = '1425cdd3ef7425fa6746d2895a233e52'; // Production
   // static const String reverbScheme = 'https';  // Production
-  static const String reverbHost = '10.0.2.2'; // Local Development (Android Emulator)
+  //static const String reverbHost = '10.0.2.2'; // Local Development (Android Emulator)
+  static const String reverbHost = '192.168.1.177'; // Local Development (Physical Device)
   static const int reverbPort = 6001; // Local Development
   static const String reverbAppKey = '1425cdd3ef7425fa6746d2895a233e52'; // Local Development
   static const String reverbScheme = 'http';  // Local Development
@@ -161,6 +165,12 @@ class ApiConstants {
   // Settings
   static const String settingsPublic = '/settings/public';
   static const String settingsRevealPrice = '/settings/reveal-price';
+
+  // Monetization
+  static const String monetization = '/monetization';
+  static const String monetizationOverview = '/monetization/overview';
+  static const String monetizationPayouts = '/monetization/payouts';
+  static const String monetizationSettings = '/monetization/settings';
 
   // Legal
   static const String legalPages = '/legal-pages';
