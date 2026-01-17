@@ -125,12 +125,26 @@ class UserService {
     return true;
   }
 
-  Future<List<User>> searchUsers(String query) async {
+  Future<List<User>> searchUsers(
+    String query, {
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    final perPageValue = perPage.clamp(1, ApiConstants.usersMaxPerPage).toInt();
+    final queryParameters = <String, dynamic>{
+      'page': page,
+      'per_page': perPageValue,
+    };
+    if (query.isNotEmpty) {
+      queryParameters['search'] = query;
+    }
+
     final response = await _apiClient.get(
       ApiConstants.users,
-      queryParameters: {'search': query},
+      queryParameters: queryParameters,
     );
     final data = response.data['users'] ?? response.data['data'] ?? [];
+    print("Fetched users: " + data.toString()); // Debug print
     return (data as List).map((u) => User.fromJson(u)).toList();
   }
 }

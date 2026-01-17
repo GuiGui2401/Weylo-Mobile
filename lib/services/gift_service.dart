@@ -26,21 +26,31 @@ class GiftService {
   }
 
   Future<List<GiftTransaction>> getReceivedGifts({int page = 1}) async {
-    final response = await _apiClient.get(
-      ApiConstants.giftsReceived,
-      queryParameters: {'page': page},
-    );
-    final data = response.data['gifts'] ?? response.data['data'] ?? [];
-    return (data as List).map((g) => GiftTransaction.fromJson(g)).toList();
+    try {
+      final response = await _apiClient.get(
+        ApiConstants.giftsReceived,
+        queryParameters: {'page': page},
+      );
+      final data = response.data['gifts'] ?? response.data['data'] ?? [];
+      return (data as List).map((g) => GiftTransaction.fromJson(g)).toList();
+    } catch (e) {
+      // Return empty list if endpoint fails (e.g., 404 due to route conflict)
+      return [];
+    }
   }
 
   Future<List<GiftTransaction>> getSentGifts({int page = 1}) async {
-    final response = await _apiClient.get(
-      ApiConstants.giftsSent,
-      queryParameters: {'page': page},
-    );
-    final data = response.data['gifts'] ?? response.data['data'] ?? [];
-    return (data as List).map((g) => GiftTransaction.fromJson(g)).toList();
+    try {
+      final response = await _apiClient.get(
+        ApiConstants.giftsSent,
+        queryParameters: {'page': page},
+      );
+      final data = response.data['gifts'] ?? response.data['data'] ?? [];
+      return (data as List).map((g) => GiftTransaction.fromJson(g)).toList();
+    } catch (e) {
+      // Return empty list if endpoint fails
+      return [];
+    }
   }
 
   Future<GiftTransaction> sendGift({

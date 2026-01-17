@@ -56,9 +56,9 @@ class ProfileProvider extends ChangeNotifier {
       _hasMoreConfessions = true;
       _userConfessions = [];
 
-      // Load user's confessions
+      // Load user's confessions using username directly (not ID)
       if (_profileUser != null) {
-        await loadUserConfessions(_profileUser!.id);
+        await loadUserConfessionsByUsername(_profileUser!.username);
       }
     } catch (e) {
       _error = e.toString();
@@ -69,7 +69,7 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 
-  /// Load user's confessions
+  /// Load user's confessions by user ID (legacy method)
   Future<void> loadUserConfessions(int userId, {bool loadMore = false}) async {
     if (!_hasMoreConfessions && loadMore) return;
 
@@ -100,6 +100,42 @@ class ProfileProvider extends ChangeNotifier {
     } catch (e) {
       if (kDebugMode) {
         print('ProfileProvider: Error loading user confessions: $e');
+        print('ProfileProvider: Stack trace: ${StackTrace.current}');
+      }
+    }
+  }
+
+  /// Load user's confessions by username (preferred method)
+  Future<void> loadUserConfessionsByUsername(String username, {bool loadMore = false}) async {
+    if (!_hasMoreConfessions && loadMore) return;
+
+    try {
+      if (kDebugMode) print('ProfileProvider: Loading confessions for user @$username');
+
+      final response = await _confessionService.getUserConfessionsByUsername(
+        username,
+        page: loadMore ? _confessionsPage : 1,
+      );
+
+      if (kDebugMode) {
+        print('ProfileProvider: Loaded ${response.confessions.length} confessions');
+        print('ProfileProvider: Has more: ${response.hasMore}');
+        print('ProfileProvider: Page: ${response.currentPage}/${response.lastPage}');
+      }
+
+      if (loadMore) {
+        _userConfessions.addAll(response.confessions);
+      } else {
+        _userConfessions = response.confessions;
+        _confessionsPage = 1;
+      }
+
+      _hasMoreConfessions = response.hasMore;
+      _confessionsPage++;
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('ProfileProvider: Error loading user confessions by username: $e');
         print('ProfileProvider: Stack trace: ${StackTrace.current}');
       }
     }

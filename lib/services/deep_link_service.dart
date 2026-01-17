@@ -43,6 +43,12 @@ class DeepLinkService {
     debugPrint('Path segments: ${uri.pathSegments}');
     debugPrint('========================================');
 
+    // Ignorer les URLs localhost en développement (Flutter Web)
+    if (uri.host == 'localhost' || uri.host == '127.0.0.1') {
+      debugPrint('Ignoring localhost URL in development');
+      return;
+    }
+
     final path = uri.path;
     final pathSegments = uri.pathSegments;
     String? targetRoute;

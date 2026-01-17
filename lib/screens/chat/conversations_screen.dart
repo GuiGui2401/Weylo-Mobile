@@ -130,6 +130,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           ],
         ),
         child: FloatingActionButton(
+          heroTag: 'conversations_fab',
           onPressed: () {
             // Start new conversation
             context.push('/new-chat');

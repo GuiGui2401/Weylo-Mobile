@@ -17,7 +17,8 @@ class GroupsScreen extends StatefulWidget {
 class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final GroupService _groupService = GroupService();
-  final RefreshController _refreshController = RefreshController();
+  final RefreshController _myGroupsRefreshController = RefreshController();
+  final RefreshController _discoverGroupsRefreshController = RefreshController();
   final TextEditingController _inviteCodeController = TextEditingController();
 
   List<Group> _myGroups = [];
@@ -35,7 +36,8 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
   @override
   void dispose() {
     _tabController.dispose();
-    _refreshController.dispose();
+    _myGroupsRefreshController.dispose();
+    _discoverGroupsRefreshController.dispose();
     _inviteCodeController.dispose();
     super.dispose();
   }
@@ -52,9 +54,13 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
         _groupService.discoverGroups(),
       ]);
 
+      final myGroups = results[0] as List<Group>;
+      final discoverGroups = results[1] as List<Group>;
+      final existingIds = myGroups.map((group) => group.id).toSet();
+
       setState(() {
-        _myGroups = results[0] as List<Group>;
-        _discoverGroups = results[1] as List<Group>;
+        _myGroups = myGroups;
+        _discoverGroups = discoverGroups.where((group) => !existingIds.contains(group.id)).toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -65,9 +71,9 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
     }
   }
 
-  Future<void> _onRefresh() async {
+  Future<void> _onRefresh(RefreshController controller) async {
     await _loadData();
-    _refreshController.refreshCompleted();
+    controller.refreshCompleted();
   }
 
   void _showJoinDialog() {
@@ -140,18 +146,32 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
               : TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildGroupsList(_myGroups, isMyGroups: true),
-                    _buildGroupsList(_discoverGroups, isDiscover: true),
+                    _buildGroupsList(
+                      _myGroups,
+                      isMyGroups: true,
+                      controller: _myGroupsRefreshController,
+                    ),
+                    _buildGroupsList(
+                      _discoverGroups,
+                      isDiscover: true,
+                      controller: _discoverGroupsRefreshController,
+                    ),
                   ],
                 ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'groups_fab',
         onPressed: () => context.push('/create-group'),
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildGroupsList(List<Group> groups, {bool isMyGroups = false, bool isDiscover = false}) {
+  Widget _buildGroupsList(
+    List<Group> groups, {
+    bool isMyGroups = false,
+    bool isDiscover = false,
+    required RefreshController controller,
+  }) {
     if (groups.isEmpty) {
       return EmptyState(
         icon: Icons.group_outlined,
@@ -165,8 +185,8 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
     }
 
     return SmartRefresher(
-      controller: _refreshController,
-      onRefresh: _onRefresh,
+      controller: controller,
+      onRefresh: () => _onRefresh(controller),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: groups.length,

@@ -24,6 +24,7 @@ class User {
   final String role;
   final String? fcmToken;
   final UserSettings? settings;
+  final bool isIdentityRevealed;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final int followersCount;
@@ -32,6 +33,7 @@ class User {
   final bool? isFollowedBy;
   final int? confessionsCount;
   final int? messagesReceivedCount;
+  final String? fullNameOverride;
 
   User({
     required this.id,
@@ -50,6 +52,7 @@ class User {
     this.role = 'user',
     this.fcmToken,
     this.settings,
+    this.isIdentityRevealed = false,
     this.createdAt,
     this.updatedAt,
     this.followersCount = 0,
@@ -58,9 +61,21 @@ class User {
     this.isFollowedBy,
     this.confessionsCount,
     this.messagesReceivedCount,
+    this.fullNameOverride,
   });
 
-  String get fullName => lastName != null ? '$firstName $lastName' : firstName;
+  String get fullName {
+    if (fullNameOverride != null && fullNameOverride!.isNotEmpty) {
+      return fullNameOverride!;
+    }
+    if (lastName != null && lastName!.isNotEmpty) {
+      return '$firstName $lastName';
+    }
+    if (firstName.isNotEmpty) {
+      return firstName;
+    }
+    return username;
+  }
 
   String get initials {
     String result = '';
@@ -77,7 +92,11 @@ class User {
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'] ?? 0,
-      firstName: json['first_name'] ?? json['firstName'] ?? '',
+      firstName: json['first_name'] ??
+          json['firstName'] ??
+          json['full_name'] ??
+          json['fullName'] ??
+          '',
       lastName: json['last_name'] ?? json['lastName'],
       username: json['username'] ?? '',
       email: json['email'],
@@ -96,6 +115,9 @@ class User {
       settings: json['settings'] != null
           ? UserSettings.fromJson(json['settings'])
           : null,
+      isIdentityRevealed: json['is_identity_revealed'] ??
+          json['isIdentityRevealed'] ??
+          false,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : null,
@@ -108,6 +130,7 @@ class User {
       isFollowedBy: json['is_followed_by'] ?? json['isFollowedBy'],
       confessionsCount: json['confessions_count'] ?? json['confessionsCount'],
       messagesReceivedCount: json['messages_received_count'] ?? json['messagesReceivedCount'],
+      fullNameOverride: json['full_name'] ?? json['fullName'],
     );
   }
 
@@ -129,6 +152,7 @@ class User {
       'role': role,
       'fcm_token': fcmToken,
       'settings': settings?.toJson(),
+      'is_identity_revealed': isIdentityRevealed,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
       'followers_count': followersCount,
@@ -137,6 +161,7 @@ class User {
       'is_followed_by': isFollowedBy,
       'confessions_count': confessionsCount,
       'messages_received_count': messagesReceivedCount,
+      'full_name': fullNameOverride,
     };
   }
 
@@ -157,12 +182,14 @@ class User {
     String? role,
     String? fcmToken,
     UserSettings? settings,
+    bool? isIdentityRevealed,
     int? followersCount,
     int? followingCount,
     bool? isFollowing,
     bool? isFollowedBy,
     int? confessionsCount,
     int? messagesReceivedCount,
+    String? fullNameOverride,
   }) {
     return User(
       id: id ?? this.id,
@@ -181,6 +208,7 @@ class User {
       role: role ?? this.role,
       fcmToken: fcmToken ?? this.fcmToken,
       settings: settings ?? this.settings,
+      isIdentityRevealed: isIdentityRevealed ?? this.isIdentityRevealed,
       createdAt: createdAt,
       updatedAt: updatedAt,
       followersCount: followersCount ?? this.followersCount,
@@ -189,6 +217,7 @@ class User {
       isFollowedBy: isFollowedBy ?? this.isFollowedBy,
       confessionsCount: confessionsCount ?? this.confessionsCount,
       messagesReceivedCount: messagesReceivedCount ?? this.messagesReceivedCount,
+      fullNameOverride: fullNameOverride ?? this.fullNameOverride,
     );
   }
 }

@@ -153,6 +153,7 @@ class _MessagesScreenState extends State<MessagesScreen> with SingleTickerProvid
           ],
         ),
         child: FloatingActionButton(
+          heroTag: 'messages_fab',
           onPressed: () => context.push('/send-message'),
           backgroundColor: Colors.transparent,
           elevation: 0,

@@ -12,6 +12,7 @@ class Conversation {
   final DateTime? lastMessageAt;
   final User? participantOne;
   final User? participantTwo;
+  final User? otherParticipant;
   final ChatMessage? lastMessage;
   final int unreadCount;
   final bool isIdentityRevealed;
@@ -31,15 +32,38 @@ class Conversation {
     this.lastMessage,
     this.unreadCount = 0,
     this.isIdentityRevealed = false,
+    this.otherParticipant,
     required this.createdAt,
     this.updatedAt,
   });
 
   User? getOtherParticipant(int currentUserId) {
-    if (participantOneId == currentUserId) {
+    if (otherParticipant != null) {
+      return otherParticipant;
+    }
+    if (participantOneId == currentUserId && participantTwo != null) {
       return participantTwo;
     }
-    return participantOne;
+    if (participantTwoId == currentUserId && participantOne != null) {
+      return participantOne;
+    }
+    return participantTwo ?? participantOne;
+  }
+
+  /// Retourne le nom à afficher selon que l'identité est révélée ou non
+  String getDisplayName(int currentUserId) {
+    if (isIdentityRevealed) {
+      final other = getOtherParticipant(currentUserId);
+      return other?.fullName ?? 'Utilisateur';
+    }
+    return 'Anonyme';
+  }
+
+  /// Retourne l'initiale de l'utilisateur pour l'affichage anonyme
+  String getDisplayInitial(int currentUserId) {
+    final other = getOtherParticipant(currentUserId);
+    final firstName = other?.firstName ?? '';
+    return firstName.isNotEmpty ? firstName[0].toUpperCase() : '?';
   }
 
   String getFlameEmoji() {
@@ -72,11 +96,21 @@ class Conversation {
       participantTwo: json['participant_two'] != null
           ? User.fromJson(json['participant_two'])
           : null,
+      otherParticipant: json['other_participant'] != null
+          ? User.fromJson(json['other_participant'])
+          : json['otherParticipant'] != null
+              ? User.fromJson(json['otherParticipant'])
+              : null,
       lastMessage: json['last_message'] != null
           ? ChatMessage.fromJson(json['last_message'])
           : null,
       unreadCount: json['unread_count'] ?? json['unreadCount'] ?? 0,
-      isIdentityRevealed: json['is_identity_revealed'] ?? json['isIdentityRevealed'] ?? false,
+      isIdentityRevealed: json['is_identity_revealed'] ??
+          json['isIdentityRevealed'] ??
+          json['identity_revealed'] ??
+          json['identityRevealed'] ??
+          json['identify_revealed'] ??
+          false,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -105,6 +139,9 @@ class Conversation {
     int? messageCount,
     DateTime? lastMessageAt,
     bool? isIdentityRevealed,
+    User? participantOne,
+    User? participantTwo,
+    User? otherParticipant,
   }) {
     return Conversation(
       id: id,
@@ -114,8 +151,9 @@ class Conversation {
       flameLevel: flameLevel,
       messageCount: messageCount ?? this.messageCount,
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
-      participantOne: participantOne,
-      participantTwo: participantTwo,
+      participantOne: participantOne ?? this.participantOne,
+      participantTwo: participantTwo ?? this.participantTwo,
+      otherParticipant: otherParticipant ?? this.otherParticipant,
       lastMessage: lastMessage ?? this.lastMessage,
       unreadCount: unreadCount ?? this.unreadCount,
       isIdentityRevealed: isIdentityRevealed ?? this.isIdentityRevealed,
@@ -156,10 +194,19 @@ class ChatMessage {
   bool get isSystem => type == 'system';
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    // Support multiple API field names for sender ID
+    final senderIdRaw = json['sender_id'] ??
+                        json['senderId'] ??
+                        json['user_id'] ??
+                        json['userId'] ??
+                        json['sender']?['id'] ??
+                        0;
+    final senderId = senderIdRaw is int ? senderIdRaw : int.tryParse(senderIdRaw.toString()) ?? 0;
+
     return ChatMessage(
       id: json['id'] ?? 0,
       conversationId: json['conversation_id'] ?? json['conversationId'] ?? 0,
-      senderId: json['sender_id'] ?? json['senderId'] ?? 0,
+      senderId: senderId,
       content: json['content'] ?? '',
       type: json['type'] ?? 'text',
       replyToId: json['reply_to_id'] ?? json['replyToId'],

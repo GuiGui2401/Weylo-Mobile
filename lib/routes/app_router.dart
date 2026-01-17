@@ -17,6 +17,7 @@ import '../services/notification_service.dart';
 import '../services/premium_service.dart';
 import '../services/group_service.dart';
 import '../services/message_service.dart';
+import '../services/chat_service.dart';
 import '../models/story.dart' hide StoryView;
 import '../models/user.dart';
 import '../models/notification.dart';
@@ -420,8 +421,14 @@ class _NewChatScreen extends StatefulWidget {
 
 class _NewChatScreenState extends State<_NewChatScreen> {
   final TextEditingController _searchController = TextEditingController();
-  List<dynamic> _searchResults = [];
-  bool _isLoading = false;
+  final UserService _userService = UserService();
+  final ChatService _chatService = ChatService();
+  final Set<int> _startingConversationIds = {};
+  List<User> _defaultUsers = [];
+  List<User> _searchResults = [];
+  String _lastQuery = '';
+  bool _isInitialLoading = true;
+  bool _isSearching = false;
 
   @override
   void dispose() {
@@ -429,28 +436,70 @@ class _NewChatScreenState extends State<_NewChatScreen> {
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
+
+  Future<void> _loadUsers() async {
+    setState(() {
+      _isInitialLoading = true;
+    });
+
+    try {
+      final users = await _userService.searchUsers('', perPage: 1000);
+      if (!mounted) return;
+      setState(() {
+        _defaultUsers = users;
+      });
+    } catch (e) {
+      debugPrint('Error loading users: $e');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isInitialLoading = false;
+      });
+    }
+  }
+
   Future<void> _searchUsers(String query) async {
+    setState(() {
+      _lastQuery = query;
+    });
+
     if (query.isEmpty) {
       setState(() => _searchResults = []);
       return;
     }
-    setState(() => _isLoading = true);
+
+    setState(() => _isSearching = true);
     try {
-      final userService = UserService();
-      final users = await userService.searchUsers(query);
+      final users = await _userService.searchUsers(query, perPage: 100);
+      if (!mounted) return;
       setState(() {
-        _searchResults = users.map((user) => {
-          'id': user.id,
-          'username': user.username,
-          'firstName': user.firstName,
-          'lastName': user.lastName,
-          'avatar': user.avatar,
-        }).toList();
-        _isLoading = false;
+        _searchResults = users;
       });
     } catch (e) {
       debugPrint('Error searching users: $e');
-      setState(() => _isLoading = false);
+    } finally {
+      if (!mounted) return;
+      setState(() => _isSearching = false);
+    }
+  }
+
+  Future<void> _startConversation(User user) async {
+    if (_startingConversationIds.contains(user.id)) return;
+    setState(() => _startingConversationIds.add(user.id));
+    try {
+      final conversation = await _chatService.startConversation(user.username);
+      if (!mounted) return;
+      context.go('/chat/${conversation.id}');
+    } catch (e) {
+      Helpers.showErrorSnackBar(context, 'Impossible de démarrer la conversation');
+    } finally {
+      if (!mounted) return;
+      setState(() => _startingConversationIds.remove(user.id));
     }
   }
 
@@ -460,43 +509,103 @@ class _NewChatScreenState extends State<_NewChatScreen> {
       appBar: AppBar(
         title: const Text('Nouvelle conversation'),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Rechercher un utilisateur...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Rechercher un utilisateur...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
+                onChanged: _searchUsers,
               ),
-              onChanged: _searchUsers,
             ),
+            Expanded(
+              child: _isInitialLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _buildUserList(),
+            ),
+          ],
+        ),
+    );
+  }
+
+  Widget _buildUserList() {
+    final showSearchResults = _lastQuery.isNotEmpty;
+    final usersToShow = showSearchResults ? _searchResults : _defaultUsers;
+
+    if (_isSearching) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (usersToShow.isEmpty) {
+      return Center(
+        child: Text(
+          showSearchResults
+              ? 'Aucun utilisateur trouvé'
+              : 'Aucun utilisateur disponible pour le moment',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.grey),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      itemBuilder: (context, index) {
+        final user = usersToShow[index];
+        final isStarting = _startingConversationIds.contains(user.id);
+        return ListTile(
+          leading: AvatarWidget(
+            imageUrl: user.avatar,
+            name: user.fullName,
+            size: 48,
           ),
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator())
-          else if (_searchResults.isEmpty)
-            const Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.person_search, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text(
-                      'Recherchez un utilisateur pour\ncommencer une conversation',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ],
-                ),
+          title: Text(user.fullName),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('@${user.username}'),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.visibility, size: 14, color: Colors.green),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Identité révélée',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
-            ),
-        ],
-      ),
+              if (user.bio != null && user.bio!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  user.bio!,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+          trailing: isStarting
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.chevron_right),
+          onTap: isStarting ? null : () => _startConversation(user),
+        );
+      },
+      separatorBuilder: (_, __) => const Divider(height: 0),
+      itemCount: usersToShow.length,
     );
   }
 }

@@ -288,7 +288,8 @@ class _StoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAnonymous = userStories.isAnonymous;
-    final displayName = isAnonymous ? 'Anonyme' : userStories.user.firstName;
+    final isHidden = isAnonymous && !userStories.isIdentityRevealed;
+    final displayName = isHidden ? 'Anonyme' : userStories.user.fullName;
     final hasUnviewed = userStories.hasUnviewed;
     final preview = userStories.preview;
 
@@ -339,9 +340,9 @@ class _StoryCard extends StatelessWidget {
                         width: 2,
                       ),
                     ),
-                    child: isAnonymous
-                        ? Container(
-                            width: 28,
+                  child: isHidden
+                      ? Container(
+                          width: 28,
                             height: 28,
                             decoration: BoxDecoration(
                               gradient: AppColors.primaryGradient,
@@ -414,7 +415,7 @@ class _StoryCard extends StatelessWidget {
                       color: Colors.white,
                       fontSize: 12,
                       fontWeight: hasUnviewed ? FontWeight.w600 : FontWeight.normal,
-                      fontStyle: isAnonymous ? FontStyle.italic : FontStyle.normal,
+                    fontStyle: isHidden ? FontStyle.italic : FontStyle.normal,
                       shadows: const [
                         Shadow(
                           blurRadius: 4,

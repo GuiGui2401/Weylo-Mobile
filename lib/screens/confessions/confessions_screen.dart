@@ -141,6 +141,7 @@ class _ConfessionsScreenState extends State<ConfessionsScreen> with SingleTicker
                   ],
                 ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'confessions_fab',
         onPressed: () => context.push('/create-confession'),
         child: const Icon(Icons.add),
       ),

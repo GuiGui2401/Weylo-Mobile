@@ -197,6 +197,7 @@ class _FeedScreenState extends State<FeedScreen> {
           ],
         ),
         child: FloatingActionButton(
+          heroTag: 'feed_fab',
           onPressed: () => _showCreatePostSheet(),
           backgroundColor: Colors.transparent,
           elevation: 0,

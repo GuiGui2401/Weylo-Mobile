@@ -1,19 +1,21 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
 import '../../core/theme/app_colors.dart';
+import '../../models/user.dart';
+import '../../models/conversation.dart';
 import '../../services/message_service.dart';
 import '../../services/user_service.dart';
+import '../../services/chat_service.dart';
+import '../../widgets/common/widgets.dart';
 import '../../widgets/voice/voice_recorder_widget.dart';
 import '../../services/voice_effects_service.dart';
 
 class SendMessageScreen extends StatefulWidget {
   final String recipientUsername;
 
-  const SendMessageScreen({
-    super.key,
-    required this.recipientUsername,
-  });
+  const SendMessageScreen({super.key, required this.recipientUsername});
 
   @override
   State<SendMessageScreen> createState() => _SendMessageScreenState();
@@ -22,8 +24,17 @@ class SendMessageScreen extends StatefulWidget {
 class _SendMessageScreenState extends State<SendMessageScreen> {
   final TextEditingController _messageController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
+
   final MessageService _messageService = MessageService();
   final ImagePicker _imagePicker = ImagePicker();
+  final UserService _userService = UserService();
+
+  /// Conseil: passez ChatService(debugLogs:true) si vous avez intégré la version
+  /// précédente que je vous ai donnée. Sinon laissez ChatService().
+  final ChatService _chatService = ChatService();
+
+  // Activez/désactivez les logs de debug de cet écran
+  final bool _debugLogs = true;
 
   bool _isAnonymous = true;
   bool _isSending = false;
@@ -32,17 +43,45 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
   File? _voiceFile;
   VoiceEffect _selectedEffect = VoiceEffect.none;
 
-  // For recipient search mode
   String? _selectedRecipient;
+
   bool _isSearching = false;
-  List<dynamic> _searchResults = [];
+  List<User> _searchResults = [];
+  List<User> _defaultUsers = [];
+  bool _isLoadingUsers = true;
+  String _searchQuery = '';
+
+  List<Conversation> _conversations = [];
+  bool _isLoadingConversations = true;
+
+  /// Index robustes pour gérer:
+  /// - "pas de conversation" => masqué
+  /// - "conversation(s) existent" => revealed = OR(logique) sur les doublons
+  final Map<String, bool> _hasConversationByUsername = {};
+  final Map<String, bool> _revealedByUsername = {};
+
+  void _log(String message) {
+    if (_debugLogs) {
+      debugPrint('[SendMessageScreen] $message');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+
     if (widget.recipientUsername.isNotEmpty) {
       _selectedRecipient = widget.recipientUsername;
     }
+
+    // IMPORTANT: charger conversations d'abord, puis users,
+    // sinon le tri/masquage se fait avant d'avoir les conversations.
+    _initData();
+  }
+
+  Future<void> _initData() async {
+    await _loadConversations();
+    await _loadUsers();
   }
 
   @override
@@ -52,23 +91,263 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
     super.dispose();
   }
 
+  bool _hasConversationWithUser(String username) =>
+      _hasConversationByUsername[username] ?? false;
+
+  bool _isIdentityRevealedForUser(String username) =>
+      _revealedByUsername[username] ?? false;
+
+  Future<void> _loadUsers() async {
+    setState(() {
+      _isLoadingUsers = true;
+    });
+
+    try {
+      final users = await _userService.searchUsers('', perPage: 1000);
+      if (!mounted) return;
+
+      final sorted = _sortUsers(users);
+
+      setState(() {
+        _defaultUsers = sorted;
+      });
+
+      _log('Users chargés: ${users.length} (defaultUsers affichés: ${_defaultUsers.length})');
+    } catch (e) {
+      _log('Error loading users: $e');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingUsers = false;
+      });
+    }
+  }
+
+  Future<void> _loadConversations() async {
+    setState(() {
+      _isLoadingConversations = true;
+    });
+
+    try {
+      final conversations = await _chatService.getConversations();
+      if (!mounted) return;
+
+      _conversations = conversations;
+
+      // Rebuild index
+      _hasConversationByUsername.clear();
+      _revealedByUsername.clear();
+
+      for (final conv in conversations) {
+        final username = conv.otherParticipant?.username;
+        if (username == null || username.isEmpty) continue;
+
+        _hasConversationByUsername[username] = true;
+
+        final previous = _revealedByUsername[username] ?? false;
+        final current = conv.isIdentityRevealed == true;
+
+        // OR logique : si une seule conv est révélée => global = true
+        _revealedByUsername[username] = previous || current;
+      }
+
+      setState(() {
+        // retrier si users déjà chargés
+        _defaultUsers = _sortUsers(_defaultUsers);
+        _searchResults = _sortUsers(_searchResults);
+      });
+
+      // DEBUG
+      _log('Conversations chargées: ${conversations.length}');
+      if (_debugLogs) {
+        for (final conv in conversations) {
+          _log('Conv: ${conv.otherParticipant?.username} - isIdentityRevealed: ${conv.isIdentityRevealed}');
+        }
+
+        _log('Index hasConversation: ${_hasConversationByUsername.length} users');
+        _log('Index revealed: ${_revealedByUsername.entries.where((e) => e.value).length} users revealed');
+      }
+    } catch (e) {
+      _log('Error loading conversations: $e');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingConversations = false;
+      });
+    }
+  }
+
   Future<void> _searchUsers(String query) async {
     if (query.isEmpty) {
-      setState(() => _searchResults = []);
-      return;
-    }
-    setState(() => _isSearching = true);
-    try {
-      final userService = UserService();
-      final users = await userService.searchUsers(query);
       setState(() {
-        _searchResults = users;
+        _searchQuery = '';
+        _searchResults = [];
         _isSearching = false;
       });
+      return;
+    }
+
+    setState(() {
+      _searchQuery = query;
+      _isSearching = true;
+    });
+
+    try {
+      final users = await _userService.searchUsers(query, perPage: 100);
+      if (!mounted) return;
+
+      final sorted = _sortUsers(users);
+
+      setState(() {
+        _searchResults = sorted;
+        _isSearching = false;
+      });
+
+      _log('Recherche "$query" => ${users.length} résultats');
     } catch (e) {
-      debugPrint('Error searching users: $e');
+      _log('Error searching users: $e');
+      if (!mounted) return;
       setState(() => _isSearching = false);
     }
+  }
+
+  /// Tri:
+  /// 1) Identité révélée (infos visibles)
+  /// 2) Le reste (masqué), trié par username
+  List<User> _sortUsers(List<User> users) {
+    final revealed = users
+        .where((u) => _isIdentityRevealedForUser(u.username))
+        .toList()
+      ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+
+    final masked = users
+        .where((u) => !_isIdentityRevealedForUser(u.username))
+        .toList()
+      ..sort((a, b) => a.username.toLowerCase().compareTo(b.username.toLowerCase()));
+
+    return [...revealed, ...masked];
+  }
+
+  Widget _buildUsersPanel() {
+    final hasQuery = _searchQuery.isNotEmpty;
+    final isLoading = hasQuery ? _isSearching : (_isLoadingUsers || _isLoadingConversations);
+
+    final users = hasQuery ? _searchResults : _defaultUsers;
+
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (users.isEmpty) {
+      return Center(
+        child: Text(
+          hasQuery ? 'Aucun utilisateur trouvé' : 'Aucun utilisateur disponible pour le moment',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.grey),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      itemCount: users.length,
+      separatorBuilder: (_, __) => const Divider(height: 0),
+      itemBuilder: (context, index) => _buildUserTile(users[index]),
+    );
+  }
+
+  Widget _buildUserTile(User user) {
+    final username = user.username;
+
+    final hasConversation = _hasConversationWithUser(username);
+    final isIdentityRevealed = _isIdentityRevealedForUser(username);
+
+    /// RÈGLE MÉTIER:
+    /// - Si identityRevealed == true => infos visibles
+    /// - Sinon => infos masquées (même si pas de conversation)
+    final shouldHideInfo = !isIdentityRevealed;
+
+    final title = shouldHideInfo ? 'Anonyme' : user.fullName;
+    final subtitle = shouldHideInfo ? 'Informations masquées' : '@${user.username}';
+    final avatarName = shouldHideInfo
+        ? (user.username.isNotEmpty ? user.username[0].toUpperCase() : '?')
+        : user.fullName;
+
+    late String statusBadge;
+    late Color statusColor;
+
+    if (isIdentityRevealed) {
+      statusBadge = 'Révélée';
+      statusColor = Colors.green;
+    } else if (hasConversation) {
+      statusBadge = 'Anonyme';
+      statusColor = Colors.orange;
+    } else {
+      statusBadge = 'Masqué';
+      statusColor = Colors.grey;
+    }
+
+    if (_debugLogs) {
+      _log('Tile @$username => hasConv=$hasConversation, revealed=$isIdentityRevealed, hide=$shouldHideInfo');
+    }
+
+    return ListTile(
+      leading: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          AvatarWidget(
+            imageUrl: !shouldHideInfo ? user.avatar : null,
+            name: avatarName,
+            size: 48,
+          ),
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isIdentityRevealed
+                  ? Icons.visibility
+                  : (hasConversation ? Icons.visibility_off : Icons.person_outline),
+              size: 12,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Expanded(
+            child: Text(subtitle, style: TextStyle(color: Colors.grey[600])),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              statusBadge,
+              style: TextStyle(
+                fontSize: 10,
+                color: statusColor,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      onTap: () {
+        setState(() {
+          _selectedRecipient = user.username;
+        });
+      },
+    );
   }
 
   Future<void> _pickImage() async {
@@ -122,15 +401,13 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
         isAnonymous: _isAnonymous,
         image: _selectedImage,
         voice: _voiceFile,
-        voiceEffect: _selectedEffect != VoiceEffect.none
-            ? _selectedEffect.name
-            : null,
+        voiceEffect: _selectedEffect != VoiceEffect.none ? _selectedEffect.name : null,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Message envoy avec succs!'),
+            content: Text('Message envoyé avec succès!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -151,12 +428,9 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Show search screen if no recipient selected
     if (_selectedRecipient == null || _selectedRecipient!.isEmpty) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Envoyer un message'),
-        ),
+        appBar: AppBar(title: const Text('Envoyer un message')),
         body: Column(
           children: [
             Padding(
@@ -174,25 +448,7 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
                 onChanged: _searchUsers,
               ),
             ),
-            if (_isSearching)
-              const Center(child: CircularProgressIndicator())
-            else if (_searchResults.isEmpty)
-              const Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.person_search, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text(
-                        'Recherchez un utilisateur pour\nlui envoyer un message',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            Expanded(child: _buildUsersPanel()),
           ],
         ),
       );
@@ -200,7 +456,7 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Envoyer à @$_selectedRecipient'),
+        title: const Text('Nouveau message'),
         actions: [
           TextButton(
             onPressed: _isSending ? null : _sendMessage,
@@ -222,7 +478,6 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Anonymous toggle
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -242,18 +497,11 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
                             children: [
                               Text(
                                 _isAnonymous ? 'Mode anonyme' : 'Mode public',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               Text(
-                                _isAnonymous
-                                    ? 'Votre identit sera cache'
-                                    : 'Votre nom sera visible',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
+                                _isAnonymous ? 'Votre identité sera cachée' : 'Votre nom sera visible',
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                               ),
                             ],
                           ),
@@ -270,15 +518,12 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 16),
-
-                  // Message input
                   TextField(
                     controller: _messageController,
                     maxLines: 8,
                     decoration: InputDecoration(
-                      hintText: 'crivez votre message...',
+                      hintText: 'Écrivez votre message...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -291,10 +536,7 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 16),
-
-                  // Selected image preview
                   if (_selectedImage != null)
                     Stack(
                       children: [
@@ -332,8 +574,6 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
                         ),
                       ],
                     ),
-
-                  // Voice message preview
                   if (_voiceFile != null)
                     Container(
                       margin: const EdgeInsets.only(top: 16),
@@ -351,16 +591,13 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Message vocal enregistr',
+                                  'Message vocal enregistré',
                                   style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
                                 if (_selectedEffect != VoiceEffect.none)
                                   Text(
                                     'Effet: ${VoiceEffectsService.getEffectName(_selectedEffect)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                    ),
+                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                                   ),
                               ],
                             ),
@@ -376,8 +613,6 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
                         ],
                       ),
                     ),
-
-                  // Voice recorder
                   if (_showVoiceRecorder)
                     Container(
                       margin: const EdgeInsets.only(top: 16),
@@ -396,8 +631,6 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
               ),
             ),
           ),
-
-          // Bottom actions
           Container(
             padding: EdgeInsets.only(
               left: 16,
@@ -427,9 +660,7 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
                 IconButton(
                   icon: Icon(
                     Icons.mic_outlined,
-                    color: _showVoiceRecorder || _voiceFile != null
-                        ? AppColors.primary
-                        : Colors.grey,
+                    color: _showVoiceRecorder || _voiceFile != null ? AppColors.primary : Colors.grey,
                   ),
                   onPressed: () {
                     setState(() {
@@ -438,7 +669,6 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
                   },
                 ),
                 const Spacer(),
-                // Voice effect selector (if voice recorder is shown)
                 if (_showVoiceRecorder)
                   PopupMenuButton<VoiceEffect>(
                     icon: const Icon(Icons.tune),
@@ -453,12 +683,8 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
                         child: Row(
                           children: [
                             Icon(
-                              _selectedEffect == effect
-                                  ? Icons.check_circle
-                                  : Icons.circle_outlined,
-                              color: _selectedEffect == effect
-                                  ? AppColors.primary
-                                  : Colors.grey,
+                              _selectedEffect == effect ? Icons.check_circle : Icons.circle_outlined,
+                              color: _selectedEffect == effect ? AppColors.primary : Colors.grey,
                               size: 20,
                             ),
                             const SizedBox(width: 8),

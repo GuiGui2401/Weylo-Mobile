@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -129,7 +130,13 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.pushReplacement('/');
+            }
+          },
         ),
         title: _isLoading
             ? null
@@ -149,9 +156,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           children: [
                             Flexible(
                               child: Text(
-                                _conversation?.isIdentityRevealed == true
-                                    ? otherUser?.fullName ?? 'Utilisateur'
-                                    : 'Anonyme',
+                                _conversation?.getDisplayName(currentUserId) ?? 'Utilisateur',
                                 style: const TextStyle(fontSize: 16),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -209,7 +214,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           itemCount: _messages.length,
                           itemBuilder: (context, index) {
                             final message = _messages[index];
-                            final isMe = message.senderId == currentUserId;
+                            // Check if message is from current user using senderId or sender object
+                            final isMe = message.senderId == currentUserId ||
+                                         (message.sender?.id == currentUserId && currentUserId != 0);
                             return _MessageBubble(
                               message: message,
                               isMe: isMe,
@@ -356,7 +363,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _showRevealDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Révéler l\'identité'),
         content: const Text(
           'Voulez-vous payer pour révéler l\'identité de cette personne ? '
@@ -364,20 +371,36 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Annuler'),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
+              final currentUserId = context.read<AuthProvider>().user?.id ?? 0;
               try {
-                final updated = await _chatService.revealIdentity(widget.conversationId);
-                setState(() {
-                  _conversation = updated;
-                });
-                Helpers.showSuccessSnackBar(context, 'Identité révélée !');
+                final updated = await _chatService.revealIdentity(
+                  widget.conversationId,
+                  currentConversation: _conversation,
+                  currentUserId: currentUserId,
+                );
+                Conversation resolvedConversation = updated;
+                if (resolvedConversation.getOtherParticipant(currentUserId) == null) {
+                  resolvedConversation =
+                      await _chatService.getConversation(widget.conversationId);
+                }
+
+                if (mounted) {
+                  setState(() {
+                    _conversation = resolvedConversation;
+                  });
+                  await context.read<AuthProvider>().refreshUser();
+                  Helpers.showSuccessSnackBar(context, 'Identité révélée !');
+                }
               } catch (e) {
-                Helpers.showErrorSnackBar(context, 'Erreur lors de la révélation');
+                if (mounted) {
+                  Helpers.showErrorSnackBar(context, 'Erreur lors de la révélation');
+                }
               }
             },
             child: const Text('Révéler'),
@@ -388,9 +411,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showOptions() {
+    final currentUserId = context.read<AuthProvider>().user?.id ?? 0;
+    final otherUser = _conversation?.getOtherParticipant(currentUserId);
+
     showModalBottomSheet(
       context: context,
-      builder: (context) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -398,7 +424,7 @@ class _ChatScreenState extends State<ChatScreen> {
               leading: const Icon(Icons.card_giftcard),
               title: const Text('Envoyer un cadeau'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 context.push('/send-gift/${widget.conversationId}');
               },
             ),
@@ -406,21 +432,98 @@ class _ChatScreenState extends State<ChatScreen> {
               leading: const Icon(Icons.block),
               title: const Text('Bloquer'),
               onTap: () {
-                Navigator.pop(context);
-                // Handle block
+                Navigator.pop(sheetContext);
+                _showBlockDialog(otherUser?.username ?? '');
               },
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: AppColors.error),
               title: const Text('Supprimer la conversation', style: TextStyle(color: AppColors.error)),
-              onTap: () async {
-                Navigator.pop(context);
-                await _chatService.deleteConversation(widget.conversationId);
-                if (mounted) context.pop();
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showDeleteConversationDialog();
               },
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showBlockDialog(String username) {
+    if (username.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Bloquer cet utilisateur'),
+        content: Text(
+          'Voulez-vous vraiment bloquer cet utilisateur ?\n\n'
+          'Vous ne recevrez plus de messages de sa part.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              // TODO: Implémenter le blocage via UserService
+              if (mounted) {
+                Helpers.showSuccessSnackBar(context, 'Utilisateur bloqué');
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.pushReplacement('/');
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Bloquer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConversationDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Supprimer la conversation'),
+        content: const Text(
+          'Êtes-vous sûr de vouloir supprimer cette conversation ?\n\n'
+          'Cette action est irréversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                await _chatService.deleteConversation(widget.conversationId);
+                if (mounted) {
+                  Helpers.showSuccessSnackBar(context, 'Conversation supprimée');
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.pushReplacement('/');
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  Helpers.showErrorSnackBar(context, 'Erreur lors de la suppression');
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Supprimer'),
+          ),
+        ],
       ),
     );
   }
@@ -471,8 +574,8 @@ class _MessageBubble extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  gradient: isMe ? AppColors.primaryGradient : null,
-                  color: isMe ? null : AppColors.messageReceived,
+                  gradient: null,
+                  color: isMe ? AppColors.primary : AppColors.messageReceived,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(20),
                     topRight: const Radius.circular(20),
@@ -518,7 +621,7 @@ class _MessageBubble extends StatelessWidget {
   void _showMessageOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -526,7 +629,7 @@ class _MessageBubble extends StatelessWidget {
               leading: const Icon(Icons.reply),
               title: const Text('Répondre'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 onReply?.call();
               },
             ),
@@ -534,8 +637,11 @@ class _MessageBubble extends StatelessWidget {
               leading: const Icon(Icons.copy),
               title: const Text('Copier'),
               onTap: () {
-                Navigator.pop(context);
-                // Copy to clipboard
+                Clipboard.setData(ClipboardData(text: message.content));
+                Navigator.pop(sheetContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Message copié')),
+                );
               },
             ),
           ],

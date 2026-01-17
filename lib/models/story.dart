@@ -151,6 +151,7 @@ class UserStories {
   final List<Story> stories;
   final bool hasUnviewed;
   final bool isAnonymous;
+  final bool isIdentityRevealed;
   final int storiesCount;
   final DateTime? latestStoryAt;
   final StoryPreview? preview;
@@ -161,6 +162,7 @@ class UserStories {
     required this.stories,
     this.hasUnviewed = false,
     this.isAnonymous = false,
+    this.isIdentityRevealed = false,
     this.storiesCount = 0,
     this.latestStoryAt,
     this.preview,
@@ -202,6 +204,11 @@ class UserStories {
       stories: stories,
       hasUnviewed: json['has_new'] ?? json['has_unviewed'] ?? json['hasUnviewed'] ?? !(json['all_viewed'] ?? true),
       isAnonymous: json['is_anonymous'] ?? json['isAnonymous'] ?? false,
+      isIdentityRevealed: json['identity_revealed'] ??
+          json['is_identity_revealed'] ??
+          json['identityRevealed'] ??
+          json['isIdentityRevealed'] ??
+          false,
       storiesCount: json['stories_count'] ?? json['storiesCount'] ?? stories.length,
       latestStoryAt: json['latest_story_at'] != null
           ? DateTime.parse(json['latest_story_at'])

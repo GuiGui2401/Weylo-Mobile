@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -34,6 +35,9 @@ void main() async {
   // Initialize timeago locale
   timeago.setLocaleMessages('fr', timeago.FrMessages());
   timeago.setDefaultLocale('fr');
+
+  // Initialize date formatting for French locale
+  await initializeDateFormatting('fr_FR', null);
 
   runApp(const WeyloApp());
 }
