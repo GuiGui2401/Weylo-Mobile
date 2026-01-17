@@ -20,17 +20,19 @@ import '../services/message_service.dart';
 import '../services/chat_service.dart';
 import '../models/story.dart' hide StoryView;
 import '../models/user.dart';
+import '../models/conversation.dart';
 import '../models/notification.dart';
 import '../models/group.dart';
 import '../models/message.dart';
 import '../core/theme/app_colors.dart';
 import '../core/utils/helpers.dart';
-import '../widgets/common/avatar_widget.dart';
+import '../services/widgets/common/avatar_widget.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
 import '../screens/main/main_navigation_screen.dart';
 import '../screens/chat/chat_screen.dart';
+import '../screens/chat/send_gift_screen.dart';
 import '../screens/wallet/wallet_screen.dart';
 import '../screens/profile/user_profile_screen.dart';
 import '../screens/profile/my_profile_screen.dart';
@@ -38,12 +40,13 @@ import '../screens/messages/send_message_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/stories/create_story_screen.dart';
 import '../screens/groups/create_group_screen.dart';
+import '../screens/groups/groups_screen.dart';
 import '../screens/monetization/earnings_screen.dart';
 import '../screens/premium/subscriptions_screen.dart';
 import '../screens/premium/premium_settings_screen.dart';
 import '../screens/confessions/confession_detail_screen.dart';
 import '../screens/search/search_screen.dart';
-import '../widgets/voice/voice_recorder_widget.dart';
+import '../services/widgets/voice/voice_recorder_widget.dart';
 
 class AppRouter {
   static GoRouter router(AuthProvider authProvider) {
@@ -166,6 +169,16 @@ class AppRouter {
           name: 'send-message',
           builder: (context, state) {
             return const SendMessageScreen(recipientUsername: '');
+          },
+        ),
+
+        // Send Gift via conversation
+        GoRoute(
+          path: '/send-gift/:conversationId',
+          name: 'send-gift',
+          builder: (context, state) {
+            final id = int.tryParse(state.pathParameters['conversationId'] ?? '') ?? 0;
+            return SendGiftScreen(conversationId: id);
           },
         ),
 
@@ -329,6 +342,15 @@ class AppRouter {
 
         // Group
         GoRoute(
+          path: '/groups',
+          name: 'groups',
+          builder: (context, state) => const GroupsScreen(),
+        ),
+        GoRoute(
+          path: '/group',
+          redirect: (_, __) => '/groups',
+        ),
+        GoRoute(
           path: '/group/:id',
           name: 'group',
           builder: (context, state) {
@@ -424,6 +446,7 @@ class _NewChatScreenState extends State<_NewChatScreen> {
   final UserService _userService = UserService();
   final ChatService _chatService = ChatService();
   final Set<int> _startingConversationIds = {};
+  Map<String, ConversationIndex> _conversationIndex = {};
   List<User> _defaultUsers = [];
   List<User> _searchResults = [];
   String _lastQuery = '';
@@ -439,19 +462,28 @@ class _NewChatScreenState extends State<_NewChatScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUsers();
+    _loadData();
   }
 
-  Future<void> _loadUsers() async {
+  Future<void> _loadData() async {
     setState(() {
       _isInitialLoading = true;
     });
 
     try {
-      final users = await _userService.searchUsers('', perPage: 1000);
+      final usersFuture = _userService.searchUsers('', perPage: 1000);
+      final convsFuture = _chatService.getConversations();
+      final results = await Future.wait([usersFuture, convsFuture]);
+      final users = results[0] as List<User>;
+      final conversations = results[1] as List<Conversation>;
+      final conversationIndex = await _chatService.getConversationsIndexByUsername(
+        conversations: conversations,
+      );
+
       if (!mounted) return;
       setState(() {
         _defaultUsers = users;
+        _conversationIndex = conversationIndex;
       });
     } catch (e) {
       debugPrint('Error loading users: $e');
@@ -509,33 +541,33 @@ class _NewChatScreenState extends State<_NewChatScreen> {
       appBar: AppBar(
         title: const Text('Nouvelle conversation'),
       ),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Rechercher un utilisateur...',
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Rechercher un utilisateur...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                onChanged: _searchUsers,
               ),
+              onChanged: _searchUsers,
             ),
-            Expanded(
-              child: _isInitialLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _buildUserList(),
-            ),
-          ],
-        ),
+          ),
+          Expanded(
+            child: _isInitialLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _buildUsersPanel(),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildUserList() {
+  Widget _buildUsersPanel() {
     final showSearchResults = _lastQuery.isNotEmpty;
     final usersToShow = showSearchResults ? _searchResults : _defaultUsers;
 
@@ -555,59 +587,254 @@ class _NewChatScreenState extends State<_NewChatScreen> {
       );
     }
 
-    return ListView.separated(
+    final sections = _buildUserSections(usersToShow);
+    final sectionWidgets = <Widget>[];
+
+    for (final section in sections) {
+      if (section.users.isEmpty) continue;
+      sectionWidgets.add(_buildSectionHeader(section));
+      for (var i = 0; i < section.users.length; i++) {
+        sectionWidgets.add(_buildUserTile(section.users[i]));
+        if (i < section.users.length - 1) {
+          sectionWidgets.add(const Divider(height: 0));
+        }
+      }
+      sectionWidgets.add(const SizedBox(height: 12));
+    }
+
+    if (sectionWidgets.isEmpty) {
+      return Center(
+        child: Text(
+          showSearchResults
+              ? 'Aucun utilisateur trouvé'
+              : 'Aucun utilisateur disponible pour le moment',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.grey),
+        ),
+      );
+    }
+
+    return ListView(
       padding: const EdgeInsets.only(top: 8, bottom: 16),
-      itemBuilder: (context, index) {
-        final user = usersToShow[index];
-        final isStarting = _startingConversationIds.contains(user.id);
-        return ListTile(
-          leading: AvatarWidget(
-            imageUrl: user.avatar,
-            name: user.fullName,
-            size: 48,
-          ),
-          title: Text(user.fullName),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('@${user.username}'),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(Icons.visibility, size: 14, color: Colors.green),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Identité révélée',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-              if (user.bio != null && user.bio!.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  user.bio!,
-                  style: Theme.of(context).textTheme.bodySmall,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ],
-          ),
-          trailing: isStarting
-              ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.chevron_right),
-          onTap: isStarting ? null : () => _startConversation(user),
-        );
-      },
-      separatorBuilder: (_, __) => const Divider(height: 0),
-      itemCount: usersToShow.length,
+      children: sectionWidgets,
     );
   }
+
+  Widget _buildUserTile(User user) {
+    final index = _conversationIndex[user.username];
+    final hasConversation = index?.hasConversation ?? false;
+    final isIdentityRevealed = index?.isIdentityRevealed ?? false;
+
+    final shouldHideInfo = !hasConversation || !isIdentityRevealed;
+    final title = shouldHideInfo ? 'Anonyme' : user.fullName;
+    final subtitle = shouldHideInfo ? 'Informations masquées' : '@${user.username}';
+    final avatarName = shouldHideInfo
+        ? (user.username.isNotEmpty ? user.username[0].toUpperCase() : '?')
+        : user.fullName;
+
+    late String statusBadge;
+    late Color statusColor;
+    if (!hasConversation) {
+      statusBadge = 'Nouveau';
+      statusColor = Colors.blue;
+    } else if (isIdentityRevealed) {
+      statusBadge = 'Révélée';
+      statusColor = Colors.green;
+    } else {
+      statusBadge = 'Anonyme';
+      statusColor = Colors.orange;
+    }
+
+    final isStarting = _startingConversationIds.contains(user.id);
+
+    return ListTile(
+      leading: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          AvatarWidget(
+            imageUrl: !shouldHideInfo ? user.avatar : null,
+            name: avatarName,
+            size: 48,
+          ),
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              hasConversation
+                  ? (isIdentityRevealed ? Icons.visibility : Icons.visibility_off)
+                  : Icons.person_outline,
+              size: 12,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Expanded(
+            child: Text(subtitle, style: TextStyle(color: Colors.grey[600])),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              statusBadge,
+              style: TextStyle(
+                fontSize: 10,
+                color: statusColor,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+      trailing: isStarting
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : TextButton(
+              onPressed: () => _startConversation(user),
+              child: const Text('Démarrer'),
+            ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      onTap: () => _startConversation(user),
+    );
+  }
+
+  Widget _buildSectionHeader(_UserSection section) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: section.accentColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                section.title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${section.users.length}',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          if (section.helper.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                section.helper,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  List<_UserSection> _buildUserSections(List<User> users) {
+    final revealed = <User>[];
+    final anonymous = <User>[];
+    final withoutConversation = <User>[];
+
+    for (final user in users) {
+      final username = user.username;
+      final index = _conversationIndex[username];
+      final hasConversation = index?.hasConversation ?? false;
+      final isIdentityRevealed = index?.isIdentityRevealed ?? false;
+
+      if (hasConversation) {
+        if (isIdentityRevealed) {
+          revealed.add(user);
+        } else {
+          anonymous.add(user);
+        }
+      } else {
+        withoutConversation.add(user);
+      }
+    }
+
+    void sortByName(List<User> list) => list.sort(
+          (a, b) => _userDisplayName(a)
+              .toLowerCase()
+              .compareTo(_userDisplayName(b).toLowerCase()),
+        );
+
+    sortByName(revealed);
+    sortByName(anonymous);
+    sortByName(withoutConversation);
+
+    return [
+      _UserSection(
+        title: 'Conversations révélées',
+        helper: 'Ils ont déjà dévoilé leur identité',
+        accentColor: Colors.green,
+        users: revealed,
+      ),
+      _UserSection(
+        title: 'Conversations anonymes',
+        helper: 'Identité masquée malgré un échange',
+        accentColor: Colors.orange,
+        users: anonymous,
+      ),
+      _UserSection(
+        title: 'Sans conversation',
+        helper: 'Pas encore échangé avec vous',
+        accentColor: Colors.blue,
+        users: withoutConversation,
+      ),
+    ];
+  }
+
+  String _userDisplayName(User user) {
+    final name = user.fullName;
+    if (name.isNotEmpty) return name;
+    return user.username;
+  }
+}
+
+class _UserSection {
+  final String title;
+  final String helper;
+  final Color accentColor;
+  final List<User> users;
+
+  const _UserSection({
+    required this.title,
+    required this.helper,
+    required this.accentColor,
+    required this.users,
+  });
 }
 
 /// Screen for creating a new confession/post

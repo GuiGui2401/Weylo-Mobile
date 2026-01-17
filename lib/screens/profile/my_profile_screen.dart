@@ -8,7 +8,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
-import '../../widgets/confessions/confession_card.dart';
+import '../../services/widgets/confessions/confession_card.dart';
 import '../../services/gift_service.dart';
 import '../../models/gift.dart';
 import '../settings/settings_screen.dart';

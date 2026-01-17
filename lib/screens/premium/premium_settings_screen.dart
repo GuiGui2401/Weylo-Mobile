@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/premium_service.dart';
-import '../../widgets/common/widgets.dart';
+import '../../services/widgets/common/widgets.dart';
 
 class PremiumSettingsScreen extends StatefulWidget {
   const PremiumSettingsScreen({super.key});

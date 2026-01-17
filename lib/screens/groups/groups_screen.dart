@@ -5,7 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/group.dart';
 import '../../services/group_service.dart';
-import '../../widgets/common/widgets.dart';
+import '../../services/widgets/common/widgets.dart';
 
 class GroupsScreen extends StatefulWidget {
   const GroupsScreen({super.key});

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -7,8 +10,9 @@ import '../../core/utils/helpers.dart';
 import '../../models/conversation.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/chat_service.dart';
-import '../../widgets/common/widgets.dart';
-import '../../widgets/stories/stories_bar.dart';
+import '../../services/websocket_service.dart';
+import '../../services/widgets/common/widgets.dart';
+import '../../services/widgets/stories/stories_bar.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
@@ -20,6 +24,8 @@ class ConversationsScreen extends StatefulWidget {
 class _ConversationsScreenState extends State<ConversationsScreen> {
   final ChatService _chatService = ChatService();
   final RefreshController _refreshController = RefreshController();
+  final WebSocketService _webSocket = WebSocketService();
+  StreamSubscription<WebSocketMessage>? _messageSubscription;
 
   List<Conversation> _conversations = [];
   bool _isLoading = true;
@@ -29,10 +35,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   void initState() {
     super.initState();
     _loadConversations();
+    _subscribeToWebSocketEvents();
   }
 
   @override
   void dispose() {
+    _messageSubscription?.cancel();
+    _messageSubscription = null;
     _refreshController.dispose();
     super.dispose();
   }
@@ -47,6 +56,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       final conversations = await _chatService.getConversations();
       setState(() {
         _conversations = conversations;
+        _sortConversations();
         _isLoading = false;
       });
     } catch (e) {
@@ -55,6 +65,63 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _subscribeToWebSocketEvents() {
+    _webSocket.connect();
+    _messageSubscription = _webSocket.messages.listen(_handleWebSocketMessage);
+  }
+
+  void _handleWebSocketMessage(WebSocketMessage message) {
+    if (!message.isChatMessage && !message.isNewMessage) return;
+    final chatMessage = ChatMessage.fromJson(message.data);
+    _applyIncomingMessage(chatMessage);
+  }
+
+  Future<void> _applyIncomingMessage(ChatMessage chatMessage) async {
+    if (!mounted) return;
+    final conversationId = chatMessage.conversationId;
+    if (conversationId == 0) return;
+
+    final currentUserId = context.read<AuthProvider>().user?.id ?? 0;
+    final existingIndex = _conversations.indexWhere((conv) => conv.id == conversationId);
+
+    if (existingIndex == -1) {
+      try {
+        final conversation = await _chatService.getConversation(conversationId);
+        if (!mounted) return;
+        setState(() {
+          _conversations.insert(0, conversation);
+          _sortConversations();
+        });
+      } catch (e) {
+        debugPrint('[Conversations] Failed to fetch conversation $conversationId: $e');
+      }
+      return;
+    }
+
+    setState(() {
+      final existing = _conversations[existingIndex];
+      final updated = existing.copyWith(
+        lastMessage: chatMessage,
+        lastMessageAt: chatMessage.createdAt,
+        messageCount: existing.messageCount + 1,
+        unreadCount: chatMessage.senderId != currentUserId
+            ? existing.unreadCount + 1
+            : existing.unreadCount,
+      );
+      _conversations.removeAt(existingIndex);
+      _conversations.insert(0, updated);
+      _sortConversations();
+    });
+  }
+
+  void _sortConversations() {
+    _conversations.sort((a, b) {
+      final aTime = a.lastMessageAt ?? a.updatedAt ?? a.createdAt;
+      final bTime = b.lastMessageAt ?? b.updatedAt ?? b.createdAt;
+      return bTime.compareTo(aTime);
+    });
   }
 
   Future<void> _onRefresh() async {

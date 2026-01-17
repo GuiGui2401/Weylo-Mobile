@@ -8,10 +8,10 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/stories/stories_bar.dart';
-import '../../widgets/confessions/confession_card.dart';
-import '../../widgets/common/empty_state.dart';
-import '../../widgets/promotions/promote_post_modal.dart';
+import '../../services/widgets/stories/stories_bar.dart';
+import '../../services/widgets/confessions/confession_card.dart';
+import '../../services/widgets/common/empty_state.dart';
+import '../../services/widgets/promotions/promote_post_modal.dart';
 import '../../services/confession_service.dart';
 import '../stories/create_story_screen.dart';
 

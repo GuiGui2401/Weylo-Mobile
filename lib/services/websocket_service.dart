@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../core/constants/api_constants.dart';
+import 'api_client.dart';
 import 'storage_service.dart';
 
 class WebSocketService {
@@ -13,6 +14,7 @@ class WebSocketService {
 
   WebSocketChannel? _channel;
   final StorageService _storage = StorageService();
+  final ApiClient _apiClient = ApiClient();
 
   final _messageController = StreamController<WebSocketMessage>.broadcast();
   final _connectionController = StreamController<bool>.broadcast();
@@ -39,11 +41,17 @@ class WebSocketService {
         return;
       }
 
-      // Reverb WebSocket URL format: ws://host:port/app/APP_KEY
-      // final wsUrl = Uri.parse('${ApiConstants.wsUrl}/app/weylo?token=$token');
-      final wsUrl = Uri.parse('${ApiConstants.wsUrl}/app/${ApiConstants.reverbAppKey}'); // DJSTAR7
+      final wsUri = Uri.parse('${ApiConstants.wsUrl}/app/${ApiConstants.reverbAppKey}').replace(
+        queryParameters: {
+          'protocol': '7',
+          'client': 'dart',
+          'version': '2.0',
+          'flash': 'false',
+          'token': token,
+        },
+      );
 
-      _channel = WebSocketChannel.connect(wsUrl);
+      _channel = WebSocketChannel.connect(wsUri);
 
       _channel!.stream.listen(
         _onMessage,
@@ -207,14 +215,47 @@ class WebSocketService {
     }
   }
 
-  void _subscribeToChannelInternal(String channel) {
-    // Pusher subscribe format
-    _sendRaw({
-      'event': 'pusher:subscribe',
-      'data': {
-        'channel': channel,
+  void _subscribeToChannelInternal(String channel) async {
+    if (_socketId == null) {
+      if (kDebugMode) print('WebSocket: Socket ID not available yet, delaying subscribe for $channel');
+      return;
+    }
+
+    try {
+      final auth = await _authorizeChannel(channel);
+      final payload = {
+        'event': 'pusher:subscribe',
+        'data': {
+          'channel': channel,
+          'auth': auth.auth,
+          if (auth.channelData != null) 'channel_data': auth.channelData,
+        },
+      };
+      _sendRaw(payload);
+    } catch (e) {
+      if (kDebugMode) print('WebSocket: Failed to authorize channel $channel - $e');
+    }
+  }
+
+  Future<_ChannelAuth> _authorizeChannel(String channel) async {
+    final socketId = _socketId;
+    if (socketId == null) {
+      throw StateError('WebSocket: Cannot authorize channel without socket id');
+    }
+
+    final response = await _apiClient.post(
+      ApiConstants.broadcastingAuth,
+      data: {
+        'socket_id': socketId,
+        'channel_name': channel,
       },
-    });
+    );
+
+    final payload = response.data;
+    return _ChannelAuth(
+      auth: payload['auth'] ?? '',
+      channelData: payload['channel_data'],
+    );
   }
 
   void subscribeToChannel(String channel) {
@@ -241,11 +282,11 @@ class WebSocketService {
   }
 
   void subscribeToConversation(int conversationId) {
-    subscribeToChannel('presence-chat.$conversationId');
+    subscribeToChannel('conversation.$conversationId');
   }
 
   void unsubscribeFromConversation(int conversationId) {
-    unsubscribeFromChannel('presence-chat.$conversationId');
+    unsubscribeFromChannel('conversation.$conversationId');
   }
 
   void subscribeToGroup(int groupId) {
@@ -272,6 +313,13 @@ class WebSocketService {
     _messageController.close();
     _connectionController.close();
   }
+}
+
+class _ChannelAuth {
+  final String auth;
+  final dynamic channelData;
+
+  const _ChannelAuth({required this.auth, this.channelData});
 }
 
 class WebSocketMessage {
@@ -306,9 +354,28 @@ class WebSocketMessage {
     );
   }
 
-  bool get isChatMessage => event == 'ChatMessageSent';
-  bool get isGroupMessage => event == 'GroupMessageSent';
-  bool get isGiftSent => event == 'GiftSent';
-  bool get isNewMessage => event == 'MessageSent';
-  bool get isPresenceUpdate => event == 'UserPresenceUpdated';
+  String get _normalizedEvent =>
+      event.toLowerCase().replaceAll(RegExp(r'[\._-]'), '');
+
+  bool _matchesEvent(String value) => _normalizedEvent == value;
+
+  bool get isChatMessage =>
+      _matchesEvent('chatmessagesent') || _matchesEvent('messagesent');
+
+  bool get isGroupMessage =>
+      _matchesEvent('groupmessagesent') || _matchesEvent('groupmessage');
+
+  bool get isGiftSent => _matchesEvent('giftsent');
+  bool get isNewMessage => _matchesEvent('messagesent');
+
+  bool get isPresenceUpdate =>
+      _matchesEvent('userpresenceupdated') ||
+      _matchesEvent('presenceevent') ||
+      _matchesEvent('presence');
+
+  bool get isTyping =>
+      _matchesEvent('clienttyping') || _matchesEvent('typingevent');
+
+  bool get isMessageStatusUpdate =>
+      _matchesEvent('messagestatusupdated') || _matchesEvent('messagestatus');
 }

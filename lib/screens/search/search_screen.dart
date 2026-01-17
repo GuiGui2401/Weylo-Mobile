@@ -5,7 +5,7 @@ import '../../models/user.dart';
 import '../../models/confession.dart';
 import '../../services/user_service.dart';
 import '../../services/confession_service.dart';
-import '../../widgets/common/avatar_widget.dart';
+import '../../services/widgets/common/avatar_widget.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});

@@ -8,8 +8,8 @@ import '../../models/story.dart';
 import '../../models/user.dart';
 import '../../services/story_service.dart';
 import '../../services/story_reply_service.dart';
-import '../../widgets/stories/story_reply_input.dart';
-import '../../widgets/common/avatar_widget.dart';
+import '../../services/widgets/stories/story_reply_input.dart';
+import '../../services/widgets/common/avatar_widget.dart';
 
 class StoryViewerScreen extends StatefulWidget {
   final List<Story> stories;

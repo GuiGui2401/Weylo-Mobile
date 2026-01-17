@@ -3,9 +3,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../services/auth_service.dart';
-import '../../widgets/common/custom_text_field.dart';
-import '../../widgets/common/custom_button.dart';
-import '../../widgets/common/loading_overlay.dart';
+import '../../services/widgets/common/custom_text_field.dart';
+import '../../services/widgets/common/custom_button.dart';
+import '../../services/widgets/common/loading_overlay.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors.dart';
 
 /// Widget pour appliquer un dégradé à une icône
 class GradientIcon extends StatelessWidget {

@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../../core/theme/app_colors.dart';
-import '../../services/voice_effects_service.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../voice_effects_service.dart';
 
 class VoiceRecorderWidget extends StatefulWidget {
   final Function(File file, VoiceEffect effect) onRecordingComplete;

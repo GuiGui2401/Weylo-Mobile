@@ -92,6 +92,7 @@ class ApiConstants {
   static String chatReveal(int conversationId) => '/chat/conversations/$conversationId/reveal';
   static String chatGift(int conversationId) => '/chat/conversations/$conversationId/gift';
   static String chatDelete(int conversationId) => '/chat/conversations/$conversationId'; // DJSTAR7
+  static const String broadcastingAuth = '/broadcasting/auth';
 
   // Groups
   static const String groups = '/groups';

@@ -136,14 +136,14 @@ class PusherService {
   }
 
   Future<void> subscribeToConversation(int conversationId) async {
-    final channelName = 'presence-chat.$conversationId';
+    final channelName = 'conversation.$conversationId';
     if (!_subscribedChannels.contains(channelName)) {
       await _pusher?.subscribe(channelName: channelName);
     }
   }
 
   Future<void> unsubscribeFromConversation(int conversationId) async {
-    final channelName = 'presence-chat.$conversationId';
+    final channelName = 'conversation.$conversationId';
     if (_subscribedChannels.contains(channelName)) {
       await _pusher?.unsubscribe(channelName: channelName);
       _subscribedChannels.remove(channelName);
@@ -207,14 +207,17 @@ class PusherService {
 
 // Extension to handle Pusher events in a type-safe way
 extension PusherEventExtension on PusherEvent {
-  bool get isChatMessage => eventName == 'ChatMessageSent';
-  bool get isGroupMessage => eventName == 'GroupMessageSent';
-  bool get isGiftSent => eventName == 'GiftSent';
-  bool get isNewMessage => eventName == 'MessageSent';
-  bool get isNewConfession => eventName == 'ConfessionCreated';
-  bool get isConfessionLiked => eventName == 'ConfessionLiked';
-  bool get isNotification => eventName == 'NotificationReceived';
-  bool get isPresenceUpdate => eventName == 'UserPresenceUpdated';
-  bool get isTyping => eventName == 'client-typing';
-  bool get isStopTyping => eventName == 'client-stop-typing';
+  String get _normalizedEvent =>
+      eventName.toLowerCase().replaceAll(RegExp(r'[\._-]'), '');
+
+  bool get isChatMessage => _normalizedEvent == 'chatmessagesent';
+  bool get isGroupMessage => _normalizedEvent == 'groupmessagesent';
+  bool get isGiftSent => _normalizedEvent == 'giftsent';
+  bool get isNewMessage => _normalizedEvent == 'messagesent';
+  bool get isNewConfession => _normalizedEvent == 'confessioncreated';
+  bool get isConfessionLiked => _normalizedEvent == 'confessionliked';
+  bool get isNotification => _normalizedEvent == 'notificationreceived';
+  bool get isPresenceUpdate => _normalizedEvent == 'userpresenceupdated';
+  bool get isTyping => _normalizedEvent == 'clienttyping';
+  bool get isStopTyping => _normalizedEvent == 'clientstoptyping';
 }

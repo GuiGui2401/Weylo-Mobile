@@ -4,7 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/premium.dart';
 import '../../services/premium_service.dart';
-import '../../widgets/common/widgets.dart';
+import '../../services/widgets/common/widgets.dart';
 
 class SubscriptionsScreen extends StatefulWidget {
   const SubscriptionsScreen({super.key});

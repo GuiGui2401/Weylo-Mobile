@@ -4,8 +4,8 @@ import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/confession.dart';
 import '../../services/confession_service.dart';
-import '../../widgets/common/widgets.dart';
-import '../../widgets/confessions/confession_card.dart';
+import '../../services/widgets/common/widgets.dart';
+import '../../services/widgets/confessions/confession_card.dart';
 
 class ConfessionsScreen extends StatefulWidget {
   const ConfessionsScreen({super.key});

@@ -6,7 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/confession.dart';
 import '../../services/confession_service.dart';
-import '../../widgets/common/avatar_widget.dart';
+import '../../services/widgets/common/avatar_widget.dart';
 
 class ConfessionDetailScreen extends StatefulWidget {
   final int confessionId;

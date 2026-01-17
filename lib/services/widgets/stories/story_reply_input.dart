@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
-import '../../services/voice_effects_service.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../voice_effects_service.dart';
 import '../voice/voice_recorder_widget.dart';
 
 class StoryReplyInput extends StatefulWidget {

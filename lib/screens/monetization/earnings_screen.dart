@@ -4,7 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/monetization.dart';
 import '../../services/monetization_service.dart';
-import '../../widgets/common/widgets.dart';
+import '../../services/widgets/common/widgets.dart';
 
 class EarningsScreen extends StatefulWidget {
   const EarningsScreen({super.key});

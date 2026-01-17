@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/theme/app_colors.dart';
-import '../../models/gift.dart';
-import '../../services/gift_service.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../models/gift.dart';
+import '../../gift_service.dart';
 import 'package:lottie/lottie.dart';
 
 class GiftBottomSheet extends StatefulWidget {

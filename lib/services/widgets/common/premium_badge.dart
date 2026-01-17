@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors.dart';
 
 /// Badge de vérification bleu style Facebook
 class VerifiedBadge extends StatelessWidget {

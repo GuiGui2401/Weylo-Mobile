@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/utils/helpers.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/helpers.dart';
 
 class AvatarWidget extends StatelessWidget {
   final String? imageUrl;

@@ -6,7 +6,7 @@ import '../../core/utils/helpers.dart';
 import '../../models/wallet.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/wallet_service.dart';
-import '../../widgets/common/widgets.dart';
+import '../../services/widgets/common/widgets.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/theme/app_colors.dart';
-import '../../models/story.dart';
-import '../../providers/auth_provider.dart';
-import '../../services/story_service.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../models/story.dart';
+import '../../../providers/auth_provider.dart';
+import '../../story_service.dart';
 import '../common/avatar_widget.dart';
 
 class StoriesBar extends StatefulWidget {

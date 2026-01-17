@@ -8,8 +8,8 @@ import '../../core/utils/helpers.dart';
 import '../../models/message.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/message_service.dart';
-import '../../widgets/common/widgets.dart';
-import '../../widgets/messages/message_card.dart';
+import '../../services/widgets/common/widgets.dart';
+import '../../services/widgets/messages/message_card.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
