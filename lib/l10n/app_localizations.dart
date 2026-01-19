@@ -1118,6 +1118,18 @@ abstract class AppLocalizations {
   /// **'Anonymous message'**
   String get anonymousMessage;
 
+  /// No description provided for @youLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get youLabel;
+
+  /// No description provided for @contactLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact'**
+  String get contactLabel;
+
   /// No description provided for @replyTo.
   ///
   /// In en, this message translates to:

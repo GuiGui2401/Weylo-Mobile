@@ -28,14 +28,35 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   StreamSubscription<WebSocketMessage>? _messageSubscription;
 
   List<Conversation> _conversations = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _hasError = false;
+  bool _hasLoadedForSession = false;
 
   @override
   void initState() {
     super.initState();
-    _loadConversations();
     _subscribeToWebSocketEvents();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = Provider.of<AuthProvider>(context);
+    if (auth.isAuthenticated) {
+      if (!_hasLoadedForSession) {
+        _hasLoadedForSession = true;
+        _loadConversations();
+      }
+    } else {
+      if (_hasLoadedForSession) {
+        _hasLoadedForSession = false;
+        setState(() {
+          _conversations = [];
+          _isLoading = false;
+          _hasError = false;
+        });
+      }
+    }
   }
 
   @override

@@ -549,6 +549,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get anonymousMessage => 'Anonymous message';
 
   @override
+  String get youLabel => 'You';
+
+  @override
+  String get contactLabel => 'Contact';
+
+  @override
   String get replyTo => 'Reply to';
 
   @override

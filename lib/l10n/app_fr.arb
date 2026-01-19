@@ -238,6 +238,8 @@
   "anonymousConversation": "Anonyme",
   "newConversationFab": "Démarrer une nouvelle conversation",
   "anonymousMessage": "Message anonyme",
+  "youLabel": "Vous",
+  "contactLabel": "Contact",
   "replyTo": "Répondre à",
   "reply": "Réponse",
   "audioPlaybackError": "Erreur lecture audio : {details}",

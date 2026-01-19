@@ -1286,6 +1286,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
 class _MessageBubble extends StatelessWidget {
   static final Map<String, Future<Uint8List?>> _videoThumbCache = {};
+  
   final ChatMessage message;
   final bool isMe;
   final String statusLabel;
@@ -1317,178 +1318,206 @@ class _MessageBubble extends StatelessWidget {
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
+          margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 12),
           constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.75,
+            maxWidth: MediaQuery.of(context).size.width * 0.82,
           ),
-          child: Column(
-            crossAxisAlignment: isMe
-                ? CrossAxisAlignment.end
-                : CrossAxisAlignment.start,
-            children: [
-              if (message.replyTo != null || localReply != null)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 4),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.divider.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          decoration: BoxDecoration(
+            color: isMe ? AppColors.primary : AppColors.messageReceived,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(isMe ? 16 : 4),
+              bottomRight: Radius.circular(isMe ? 4 : 16),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(5.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (message.replyTo != null || localReply != null)
+                  _buildReplyPreview(context),
+
+                if (message.hasImage && (mediaUrl ?? '').isNotEmpty)
+                  _buildImagePreview(),
+                
+                if (message.hasVideo && (mediaUrl ?? '').isNotEmpty)
+                  _buildVideoPreview(context, mediaUrl!),
+
+                if (message.hasVoice && (mediaUrl ?? '').isNotEmpty)
+                  _buildAudioPlayer(),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.end,
+                    spacing: 10,
+                    runSpacing: 4,
                     children: [
-                      if (localReply != null && message.replyTo == null)
-                        Text(
-                          localReply!.title,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
+                      LinkText(
+                        text: message.content, 
+                        style: TextStyle(
+                          color: isMe ? Colors.white : AppColors.textPrimary,
+                          fontSize: 15,
                         ),
-                      Text(
-                        message.replyTo?.content ?? localReply?.content ?? '',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontStyle: FontStyle.italic,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              if (message.hasImage && (mediaUrl ?? '').isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(
-                    imageUrl: mediaUrl!,
-                    width: double.infinity,
-                    height: 200,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      height: 200,
-                      color: Colors.grey[300],
-                      child: const Center(child: CircularProgressIndicator()),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      height: 200,
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: Icon(
-                          Icons.broken_image_outlined,
-                          color: Colors.grey,
+                        linkStyle: TextStyle(
+                          color: isMe ? Colors.white : AppColors.primary,
+                          decoration: TextDecoration.underline,
                         ),
                       ),
-                    ),
-                  ),
-                ),
-              if (message.hasVideo && (mediaUrl ?? '').isNotEmpty)
-                _buildVideoPreview(context, mediaUrl!, isMe),
-              if (message.hasVoice && (mediaUrl ?? '').isNotEmpty)
-                Row(
-                  children: [
-                    IconButton(
-                      icon: isAudioLoading && playingMessageId == message.id
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(
-                              playingMessageId == message.id
-                                  ? Icons.pause_circle_filled
-                                  : Icons.play_circle_fill,
-                              color: isMe ? Colors.white : AppColors.primary,
-                            ),
-                      onPressed: onPlayVoice,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Container(
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: isMe ? Colors.white30 : Colors.grey[400],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              if (message.content.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: null,
-                    color: isMe ? AppColors.primary : AppColors.messageReceived,
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(20),
-                      topRight: const Radius.circular(20),
-                      bottomLeft: Radius.circular(isMe ? 20 : 4),
-                      bottomRight: Radius.circular(isMe ? 4 : 20),
-                    ),
-                  ),
-                  child: LinkText(
-                    text: message.content,
-                    style: TextStyle(
-                      color: isMe ? Colors.white : AppColors.textPrimary,
-                      fontSize: 15,
-                    ),
-                    linkStyle: TextStyle(
-                      color: isMe ? Colors.white : AppColors.primary,
-                      fontSize: 15,
-                      decoration: TextDecoration.underline,
-                    ),
-                    showPreview: true,
-                    previewBackgroundColor: isMe
-                        ? Colors.white.withOpacity(0.15)
-                        : Colors.black.withOpacity(0.05),
-                    previewTextColor: isMe
-                        ? Colors.white
-                        : AppColors.textPrimary,
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.max,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Flexible(
-                      child: Row(
+                      Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             Helpers.formatTime(message.createdAt),
-                            style: Theme.of(
-                              context,
-                            ).textTheme.bodySmall?.copyWith(fontSize: 11),
-                          ),
-                          if (statusLabel.isNotEmpty) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                              statusLabel,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    fontSize: 11,
-                                    color: isMe
-                                        ? AppColors.textPrimary
-                                        : AppColors.textSecondary,
-                                    fontWeight: isMe
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                  ),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isMe 
+                                  ? Colors.white.withOpacity(0.7) 
+                                  : AppColors.textSecondary,
                             ),
+                          ),
+                          if (isMe) ...[
+                            const SizedBox(width: 4),
+                            _buildStatusIcon(),
                           ],
                         ],
                       ),
-                    ),
-                    if (isMe && message.isRead) ...[
-                      const SizedBox(width: 4),
-                      Icon(Icons.done_all, size: 14, color: AppColors.primary),
                     ],
-                  ],
+                  ),
                 ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReplyPreview(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border(
+          left: BorderSide(color: isMe ? Colors.white70 : AppColors.primary, width: 4),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            localReply?.title ?? (isMe ? l10n.youLabel : l10n.contactLabel),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isMe ? Colors.white : AppColors.primary),
+          ),
+          Text(
+            message.replyTo?.content ?? localReply?.content ?? '',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: isMe ? Colors.white.withOpacity(0.9) : AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImagePreview() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: CachedNetworkImage(
+        imageUrl: mediaUrl!,
+        width: double.infinity,
+        height: 200,
+        fit: BoxFit.cover,
+      ),
+    );
+  }
+
+  Widget _buildVideoPreview(BuildContext context, String url) {
+    final future = _videoThumbCache.putIfAbsent(url, () => 
+      VideoThumbnail.thumbnailData(video: url, imageFormat: ImageFormat.JPEG, quality: 70)
+    );
+    return GestureDetector(
+      onTap: onOpenVideo,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            FutureBuilder<Uint8List?>(
+              future: future,
+              builder: (context, snap) => snap.hasData 
+                ? Image.memory(snap.data!, height: 200, width: double.infinity, fit: BoxFit.cover)
+                : Container(height: 200, color: Colors.black12),
+            ),
+            const Icon(Icons.play_circle_filled, size: 50, color: Colors.white),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAudioPlayer() {
+    final isPlaying = playingMessageId == message.id;
+    final barColor = isMe ? Colors.white : AppColors.primary;
+    const waveformBars = [6.0, 12.0, 8.0, 16.0, 10.0, 14.0, 8.0];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: GestureDetector(
+        onTap: onPlayVoice,
+        child: Container(
+          decoration: BoxDecoration(
+            color: barColor.withOpacity(isMe ? 0.25 : 0.16),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              if (isAudioLoading && isPlaying)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: barColor,
+                  ),
+                )
+              else
+                Icon(
+                  isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                  color: barColor,
+                  size: 24,
+                ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: waveformBars.map((height) {
+                    return Container(
+                      width: 3,
+                      height: height,
+                      decoration: BoxDecoration(
+                        color: barColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                statusLabel.isNotEmpty
+                    ? statusLabel
+                    : Helpers.formatTime(message.createdAt),
+                style: TextStyle(fontSize: 12, color: barColor.withOpacity(0.85)),
               ),
             ],
           ),
@@ -1497,85 +1526,41 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildVideoPreview(BuildContext context, String url, bool isMe) {
-    final future = _videoThumbCache.putIfAbsent(
-      url,
-      () => VideoThumbnail.thumbnailData(
-        video: url,
-        imageFormat: ImageFormat.JPEG,
-        quality: 70,
-        maxWidth: 720,
-      ),
-    );
-
-    return GestureDetector(
-      onTap: onOpenVideo,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            FutureBuilder<Uint8List?>(
-              future: future,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done &&
-                    snapshot.data != null) {
-                  return Image.memory(
-                    snapshot.data!,
-                    width: double.infinity,
-                    height: 200,
-                    fit: BoxFit.cover,
-                  );
-                }
-                return Container(
-                  height: 200,
-                  width: double.infinity,
-                  color: Colors.grey[300],
-                );
-              },
-            ),
-            Icon(
-              Icons.play_circle_fill,
-              size: 56,
-              color: isMe ? Colors.white : AppColors.primary,
-            ),
-          ],
-        ),
-      ),
+  Widget _buildStatusIcon() {
+    return Icon(
+      message.isRead ? Icons.done_all : Icons.done,
+      size: 16,
+      color: message.isRead ? Colors.blueAccent : Colors.white.withOpacity(0.7),
     );
   }
 
   void _showMessageOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.reply),
-              title: Text(AppLocalizations.of(sheetContext)!.reply),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                onReply?.call();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.copy),
-              title: Text(AppLocalizations.of(sheetContext)!.copyAction),
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: message.content));
-                Navigator.pop(sheetContext);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(AppLocalizations.of(context)!.messageCopied),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        final l10n = AppLocalizations.of(ctx)!;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.reply),
+                title: Text(l10n.replyAction),
+                onTap: () { Navigator.pop(ctx); onReply?.call(); },
+              ),
+              ListTile(
+                leading: const Icon(Icons.copy),
+                title: Text(l10n.copyAction),
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: message.content));
+                  Navigator.pop(ctx);
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
