@@ -4,8 +4,8 @@ class ApiConstants {
   //static const String baseUrl = 'http://10.0.2.2:8000/api/v1'; // Local Development (Android Emulator)
   //static const String wsUrl = 'wss://10.0.2.2:8000'; // Local Development (Android Emulator)
 
-  static const String baseUrl ='http://192.168.43.73:8001/api/v1'; // Local Development (Physical Device)
-  static const String wsUrl ='ws://192.168.43.73:8080'; // Local Development (Physical Device)
+  static const String baseUrl ='http://172.20.10.2:8000/api/v1'; // Local Development (Physical Device)
+  static const String wsUrl ='ws://172.20.10.2:8080'; // Local Development (Physical Device)
 
   // Reverb/Pusher Configuration
   // static const String reverbHost = 'weylo-adminpanel.space'; // Production
@@ -14,8 +14,8 @@ class ApiConstants {
   // static const String reverbScheme = 'https';  // Production
   //static const String reverbHost = '10.0.2.2'; // Local Development (Android Emulator)
   static const String reverbAppId = 'Weylo-app'; // Local Development
-  static const String reverbHost = '192.168.43.73'; // Local Development
-  static const int reverbPort = 8080; // Local Development
+  static const String reverbHost = '172.20.10.2'; // Local Development
+  static const int reverbPort = 6001; // Local Development
   static const String reverbAppKey = '1425cdd3ef7425fa6746d2895a233e52'; // Local Development
   static const String reverbAppSecret =
       '0684dbd3bef3b2550a2be1d8fea7e1d6464e19c8a3e925064f9fac17d4f60077'; // Local Development
@@ -160,6 +160,8 @@ class ApiConstants {
   // Post Promotions
   static const String promotionsPricing = '/promotions/pricing';
   static const String myPromotions = '/promotions/my-promotions';
+  static const String promotionsBalance = '/promotions/balance';
+  static const String promotionsTopup = '/promotions/topup';
   static String promoteConfession(int confessionId) => '/promotions/confessions/$confessionId';
   static String cancelPromotion(int promotionId) => '/promotions/$promotionId';
   static String promotionStats(int promotionId) => '/promotions/$promotionId/stats';

@@ -11,10 +11,18 @@ class PromotionService {
   }
 
   /// Promote a confession/post
-  Future<Map<String, dynamic>> promotePost(int confessionId, int durationHours) async {
+  Future<Map<String, dynamic>> promotePost(
+    int confessionId,
+    int durationHours, {
+    Map<String, dynamic>? data,
+  }) async {
+    final payload = <String, dynamic>{'duration_hours': durationHours};
+    if (data != null) {
+      payload.addAll(data);
+    }
     final response = await _api.post(
       ApiConstants.promoteConfession(confessionId),
-      data: {'duration_hours': durationHours},
+      data: payload,
     );
     return response.data;
   }
@@ -24,6 +32,25 @@ class PromotionService {
     final response = await _api.get(
       ApiConstants.myPromotions,
       queryParameters: {'page': page},
+    );
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> getPromotionBalance() async {
+    final response = await _api.get(ApiConstants.promotionsBalance);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> topupPromotionBalance({
+    required double amount,
+    required String method,
+  }) async {
+    final response = await _api.post(
+      ApiConstants.promotionsTopup,
+      data: {
+        'amount': amount,
+        'method': method,
+      },
     );
     return response.data;
   }

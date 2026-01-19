@@ -141,23 +141,8 @@ class MessageCard extends StatelessWidget {
           size: 48,
         );
       }
-      return Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          gradient: AppColors.primaryGradient,
-          shape: BoxShape.circle,
-        ),
-        child: Center(
-          child: Text(
-            message.senderInitials,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
+      return _PulsingAvatarPlaceholder(
+        initials: message.senderInitials,
       );
     } else {
       return AvatarWidget(
@@ -200,5 +185,59 @@ class MessageCard extends StatelessWidget {
         ),
       );
     }
+  }
+}
+
+class _PulsingAvatarPlaceholder extends StatefulWidget {
+  final String initials;
+
+  const _PulsingAvatarPlaceholder({required this.initials});
+
+  @override
+  State<_PulsingAvatarPlaceholder> createState() => _PulsingAvatarPlaceholderState();
+}
+
+class _PulsingAvatarPlaceholderState extends State<_PulsingAvatarPlaceholder>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  )..repeat(reverse: true);
+
+  late final Animation<double> _pulse = Tween<double>(begin: 0.2, end: 0.6).animate(
+    CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) {
+        return Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.grey.withOpacity(0.3 + _pulse.value * 0.4),
+          ),
+          child: Center(
+            child: Text(
+              widget.initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }

@@ -7,6 +7,7 @@ import '../../models/confession.dart';
 import '../../services/user_service.dart';
 import '../../services/confession_service.dart';
 import '../../services/widgets/common/avatar_widget.dart';
+import '../../services/widgets/common/premium_badge.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -274,18 +275,7 @@ class _UserSearchTile extends StatelessWidget {
             ),
             if (user.isPremium) ...[
               const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1877F2), // Bleu Facebook vérifié
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check,
-                  size: 10,
-                  color: Colors.white,
-                ),
-              ),
+              const VerifiedBadge(size: 14),
             ],
           ],
         ),

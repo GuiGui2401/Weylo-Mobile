@@ -1,4 +1,5 @@
 import 'user.dart';
+import 'gift.dart';
 
 enum FlameLevel { none, yellow, orange, purple }
 
@@ -174,6 +175,7 @@ class ChatMessage {
   final int? replyToId;
   final bool isRead;
   final User? sender;
+  final Gift? gift;
   final ChatMessage? replyTo;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -189,6 +191,7 @@ class ChatMessage {
     this.replyToId,
     this.isRead = false,
     this.sender,
+    this.gift,
     this.replyTo,
     required this.createdAt,
     this.updatedAt,
@@ -221,6 +224,9 @@ class ChatMessage {
       replyToId: json['reply_to_id'] ?? json['replyToId'],
       isRead: json['is_read'] ?? json['isRead'] ?? false,
       sender: json['sender'] != null ? User.fromJson(json['sender']) : null,
+      gift: json['gift_data'] != null
+          ? Gift.fromJson(json['gift_data'])
+          : (json['gift'] != null ? Gift.fromJson(json['gift']) : null),
       replyTo: json['reply_to'] != null
           ? ChatMessage.fromJson(json['reply_to'])
           : null,

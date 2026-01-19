@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:lottie/lottie.dart';
 import '../../l10n/app_localizations.dart';
 import 'dart:typed_data';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -14,7 +15,9 @@ import '../../models/confession.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../services/confession_service.dart';
+import '../../services/deep_link_service.dart';
 import '../../services/widgets/confessions/confession_card.dart';
+import '../../services/widgets/common/premium_badge.dart';
 import '../../services/gift_service.dart';
 import '../../services/widgets/promotions/promote_post_modal.dart';
 import '../../models/gift.dart';
@@ -133,9 +136,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     delegate: _SliverTabBarDelegate(
                       TabBar(
                         controller: _tabController,
-                        labelColor: AppColors.secondary,
-                        unselectedLabelColor: Colors.grey,
-                        indicatorColor: AppColors.primary,
+                        labelColor: Theme.of(context).colorScheme.primary,
+                        unselectedLabelColor:
+                            Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey,
+                        indicatorColor: Theme.of(context).colorScheme.primary,
                         tabs: [
                           Tab(icon: const Icon(Icons.grid_on), text: l10n.profilePostsTab),
                           Tab(icon: const Icon(Icons.favorite_border), text: l10n.profileLikesTab),
@@ -209,25 +213,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     Positioned(
                       bottom: 0,
                       right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF1877F2), // Bleu Facebook vérifié
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check,
-                            size: 12,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+                      child: const VerifiedBadge(size: 20),
                     ),
                 ],
               ),
@@ -353,6 +339,39 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => context.push('/promotions'),
+                borderRadius: BorderRadius.circular(8),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.trending_up, size: 18, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Promotions',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
                         ),
                       ),
                     ],
@@ -562,7 +581,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 title: Text(l10n.profileShare),
                 onTap: () {
                   Navigator.pop(ctx);
-                  final shareUrl = _buildPostShareUrl(confession.id);
+                  final shareUrl = DeepLinkService.getPostShareLink(confession.id);
                   Share.share(
                     l10n.profileSharePostMessage(
                       '${ApiConstants.baseUrl.replaceFirst(RegExp(r"/api/v1/?$"), "")}/post/${confession.id}',
@@ -711,11 +730,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     return Uri.encodeFull('$base/storage/$cleaned');
   }
 
-  String _buildPostShareUrl(int confessionId) {
-    final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/api/v1/?$'), '');
-    return '$base/post/$confessionId';
-  }
-
   Widget _buildLikesTab() {
     return Consumer<ProfileProvider>(
       builder: (context, profileProvider, child) {
@@ -833,29 +847,11 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 gradient: AppColors.primaryGradient,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: gift?.icon != null && gift!.icon.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: CachedNetworkImage(
-                        imageUrl: gift.icon,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const Icon(
-                          Icons.card_giftcard,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        errorWidget: (context, url, error) => const Icon(
-                          Icons.card_giftcard,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                    )
-                  : const Icon(
-                      Icons.card_giftcard,
-                      color: Colors.white,
-                      size: 28,
-                    ),
+              child: gift != null ? _buildGiftMedia(gift) : const Icon(
+                Icons.card_giftcard,
+                color: Colors.white,
+                size: 28,
+              ),
             ),
             const SizedBox(width: 16),
             // Gift info
@@ -922,6 +918,73 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildGiftMedia(Gift gift) {
+    final animationUrl = _resolveGiftUrl(gift.animation);
+    final iconUrl = _resolveGiftUrl(gift.icon);
+
+    if (animationUrl.isNotEmpty) {
+      final lower = animationUrl.toLowerCase();
+      if (lower.endsWith('.json')) {
+        return Lottie.network(
+          animationUrl,
+          width: 56,
+          height: 56,
+          fit: BoxFit.contain,
+        );
+      }
+      return CachedNetworkImage(
+        imageUrl: animationUrl,
+        width: 56,
+        height: 56,
+        fit: BoxFit.contain,
+      );
+    }
+
+    if (iconUrl.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: iconUrl,
+        width: 56,
+        height: 56,
+        fit: BoxFit.cover,
+      );
+    }
+
+    return const Icon(
+      Icons.card_giftcard,
+      color: Colors.white,
+      size: 28,
+    );
+  }
+
+  String _resolveGiftUrl(String? url) {
+    if (url == null || url.isEmpty) return '';
+    final cleaned = url.replaceAll('\\', '/');
+    final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/api/v1/?$'), '');
+    final baseUri = Uri.parse(base);
+
+    if (cleaned.startsWith('http')) {
+      final mediaUri = Uri.parse(cleaned);
+      if (mediaUri.host != baseUri.host || mediaUri.port != baseUri.port) {
+        final rewritten = mediaUri.replace(
+          scheme: baseUri.scheme,
+          host: baseUri.host,
+          port: baseUri.hasPort ? baseUri.port : null,
+        );
+        return Uri.encodeFull(rewritten.toString());
+      }
+      return Uri.encodeFull(cleaned);
+    }
+    if (cleaned.startsWith('//')) return Uri.encodeFull('https:$cleaned');
+
+    if (cleaned.startsWith('/storage/')) {
+      return Uri.encodeFull('$base$cleaned');
+    }
+    if (cleaned.startsWith('storage/')) {
+      return Uri.encodeFull('$base/$cleaned');
+    }
+    return Uri.encodeFull('$base/storage/$cleaned');
   }
 
   String _formatDate(BuildContext context, DateTime date) {
@@ -1151,5 +1214,5 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) => false;
+  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) => true;
 }

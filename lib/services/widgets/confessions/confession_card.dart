@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:video_player/video_player.dart';
 import 'package:provider/provider.dart';
 import 'package:visibility_detector/visibility_detector.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -11,6 +12,7 @@ import '../../../models/confession.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/feed_provider.dart';
 import '../../confession_service.dart';
+import '../../promotion_service.dart';
 import '../common/avatar_widget.dart';
 import '../common/link_text.dart';
 import '../common/premium_badge.dart';
@@ -42,7 +44,7 @@ class ConfessionCard extends StatefulWidget {
   State<ConfessionCard> createState() => _ConfessionCardState();
 }
 
-class _ConfessionCardState extends State<ConfessionCard> {
+class _ConfessionCardState extends State<ConfessionCard> with SingleTickerProviderStateMixin {
   VideoPlayerController? _videoController;
   bool _isVideoInitialized = false;
   bool _videoInitError = false;
@@ -50,11 +52,23 @@ class _ConfessionCardState extends State<ConfessionCard> {
   bool _isMuted = false;
   bool _isContentExpanded = false;
   bool _hasReportedView = false;
+  bool _hasReportedPromotionImpression = false;
   final ConfessionService _confessionService = ConfessionService();
+  final PromotionService _promotionService = PromotionService();
+  late final AnimationController _likeController;
+  late final Animation<double> _likeScale;
+  bool _isLikeAnimating = false;
 
   @override
   void initState() {
     super.initState();
+    _likeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
+    _likeScale = Tween<double>(begin: 0.6, end: 1.2).animate(
+      CurvedAnimation(parent: _likeController, curve: Curves.easeOutBack),
+    );
     if (widget.confession.hasVideo) {
       _initVideoPlayer();
     }
@@ -64,6 +78,7 @@ class _ConfessionCardState extends State<ConfessionCard> {
   void dispose() {
     _videoController?.removeListener(_handleVideoProgress);
     _videoController?.dispose();
+    _likeController.dispose();
     super.dispose();
   }
 
@@ -139,8 +154,9 @@ class _ConfessionCardState extends State<ConfessionCard> {
     final isOwnPost = currentUser?.id == confession.authorId;
     final imageUrl = _resolveMediaUrl(confession.imageUrl);
     final hasImage = confession.hasImage && imageUrl.isNotEmpty;
+    final actionColor = _actionIconColor(context);
 
-    return Card(
+    final cardContent = Card(
       elevation: 1,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -174,6 +190,24 @@ class _ConfessionCardState extends State<ConfessionCard> {
                               Helpers.getTimeAgo(confession.createdAt),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
+                            if (confession.isSponsored) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'Sponsorisé',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
                             if (confession.type == ConfessionType.private) ...[
                               const SizedBox(width: 8),
                               Container(
@@ -314,6 +348,8 @@ class _ConfessionCardState extends State<ConfessionCard> {
             // Video
             if (confession.hasVideo)
               _buildVideoSection(),
+            if (confession.isSponsored)
+              _buildSponsoredCta(context),
             // Recipient info if private
             if (confession.recipient != null)
               Padding(
@@ -357,31 +393,43 @@ class _ConfessionCardState extends State<ConfessionCard> {
               child: Row(
                 children: [
                   _buildActionButton(
-                    icon: confession.isLiked ? Icons.favorite : Icons.favorite_outline,
+                    icon: confession.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                     label: Helpers.formatNumber(confession.likesCount),
-                    color: confession.isLiked ? AppColors.error : null,
-                    onTap: widget.onLike,
+                    color: confession.isLiked ? Colors.red : actionColor,
+                    onTap: _handleLikeTap,
+                    isLike: true,
                   ),
                   const SizedBox(width: 12),
                   _buildActionButton(
-                    icon: Icons.mode_comment_outlined,
+                    icon: Icons.mode_comment_rounded,
                     label: Helpers.formatNumber(confession.commentsCount),
+                    color: actionColor,
                     onTap: widget.onComment,
                   ),
                   const SizedBox(width: 12),
                   _buildActionButton(
-                    icon: Icons.visibility_outlined,
+                    icon: Icons.visibility_rounded,
                     label: Helpers.formatNumber(confession.viewsCount),
+                    color: actionColor,
                   ),
-                  if (isOwnPost) ...[
+                  if (confession.isSponsored && isOwnPost && confession.promotionId != null) ...[
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: _showPromotionStats,
+                      icon: const Icon(Icons.bar_chart, size: 16),
+                      label: const Text('Stats'),
+                    ),
+                    const SizedBox(width: 8),
+                  ] else if (isOwnPost) ...[
                     const Spacer(),
                     _buildBoostButton(context),
                     const SizedBox(width: 8),
                   ] else
                     const Spacer(),
                   _buildActionButton(
-                    icon: Icons.share_outlined,
+                    icon: Icons.share_rounded,
                     label: 'Partager',
+                    color: actionColor,
                     onTap: widget.onShare,
                   ),
                 ],
@@ -390,6 +438,20 @@ class _ConfessionCardState extends State<ConfessionCard> {
           ],
         ),
       ),
+    );
+
+    if (!confession.isSponsored) return cardContent;
+
+    return VisibilityDetector(
+      key: ValueKey('confession_impression_${confession.id}'),
+      onVisibilityChanged: (info) {
+        if (_hasReportedPromotionImpression) return;
+        if (info.visibleFraction >= 0.6) {
+          _hasReportedPromotionImpression = true;
+          _reportPromotionImpression();
+        }
+      },
+      child: cardContent,
     );
   }
 
@@ -544,6 +606,98 @@ class _ConfessionCardState extends State<ConfessionCard> {
     } catch (_) {}
   }
 
+  Future<void> _reportPromotionImpression() async {
+    try {
+      await _confessionService.markPromotionImpression(confession.id);
+    } catch (_) {}
+  }
+
+  Future<void> _reportPromotionClick() async {
+    try {
+      await _confessionService.markPromotionClick(confession.id);
+    } catch (_) {}
+  }
+
+  Widget _buildSponsoredCta(BuildContext context) {
+    final label = confession.promotionCtaLabel ?? 'Voir plus';
+    final websiteUrl = confession.promotionWebsiteUrl;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton(
+          onPressed: () async {
+            await _reportPromotionClick();
+            if (websiteUrl != null && websiteUrl.isNotEmpty) {
+              final uri = Uri.tryParse(websiteUrl);
+              if (uri != null) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                return;
+              }
+            }
+            widget.onAuthorTap?.call();
+          },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            side: BorderSide(color: AppColors.primary.withOpacity(0.4)),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showPromotionStats() async {
+    final promotionId = confession.promotionId;
+    if (promotionId == null) return;
+    try {
+      final response = await _promotionService.getPromotionStats(promotionId);
+      final stats = response['data'] ?? {};
+      if (!mounted) return;
+      showModalBottomSheet(
+        context: context,
+        builder: (sheetContext) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Statistiques sponsorisées',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                _statRow('Impressions', '${stats['impressions'] ?? 0}'),
+                _statRow('Clics', '${stats['clicks'] ?? 0}'),
+                _statRow('CTR', '${stats['ctr'] ?? 0}%'),
+                _statRow('Budget dépensé', '${stats['budget_spent'] ?? 0}'),
+                _statRow('Reach estimé', '${stats['estimated_reach'] ?? '-'}'),
+                _statRow('Vues estimées', '${stats['estimated_views'] ?? '-'}'),
+                _statRow('Temps restant', '${stats['time_remaining'] ?? '-'}'),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (_) {}
+  }
+
+  Widget _statRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: const TextStyle(color: AppColors.textSecondary))),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAuthorInfo(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     if (confession.shouldShowAuthor && confession.author != null) {
@@ -619,26 +773,48 @@ class _ConfessionCardState extends State<ConfessionCard> {
     required String label,
     Color? color,
     VoidCallback? onTap,
+    bool isLike = false,
   }) {
+    final fillColor = color ?? AppColors.textSecondary;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 18,
-              weight: 700,
-              color: color ?? AppColors.textSecondary,
-            ),
+            if (isLike)
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 20,
+                    color: fillColor,
+                  ),
+                  if (_isLikeAnimating)
+                    ScaleTransition(
+                      scale: _likeScale,
+                      child: const Icon(
+                        Icons.favorite_rounded,
+                        size: 22,
+                        color: Colors.red,
+                      ),
+                    ),
+                ],
+              )
+            else
+              Icon(
+                icon,
+                size: 20,
+                color: fillColor,
+              ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: color ?? AppColors.textSecondary,
-                fontSize: 13,
+                color: fillColor,
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -646,6 +822,33 @@ class _ConfessionCardState extends State<ConfessionCard> {
         ),
       ),
     );
+  }
+
+  Color _actionIconColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? Colors.white : Colors.black87;
+  }
+
+  void _handleLikeTap() {
+    if (confession.isLiked) {
+      widget.onLike?.call();
+      return;
+    }
+
+    setState(() {
+      _isLikeAnimating = true;
+    });
+    _likeController.forward(from: 0);
+    Future.delayed(const Duration(milliseconds: 180), () {
+      widget.onLike?.call();
+    });
+    Future.delayed(const Duration(milliseconds: 320), () {
+      if (mounted) {
+        setState(() {
+          _isLikeAnimating = false;
+        });
+      }
+    });
   }
 
   void _showOptions(BuildContext context, bool isOwnPost) {
@@ -706,9 +909,9 @@ class _ConfessionCardState extends State<ConfessionCard> {
                 ListTile(
                   leading: const Icon(Icons.flag_outlined),
                   title: Text(l10n.reportAction),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(ctx);
-                    // Handle report
+                    _showReportDialog(context);
                   },
                 ),
             ],
@@ -716,6 +919,110 @@ class _ConfessionCardState extends State<ConfessionCard> {
         );
       },
     );
+  }
+
+  Future<void> _showReportDialog(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    const reasons = [
+      {'value': 'spam', 'label': 'Spam'},
+      {'value': 'harassment', 'label': 'Harcèlement'},
+      {'value': 'hate_speech', 'label': 'Discours haineux'},
+      {'value': 'inappropriate_content', 'label': 'Contenu inapproprié'},
+      {'value': 'impersonation', 'label': 'Usurpation d’identité'},
+      {'value': 'other', 'label': 'Autre'},
+    ];
+
+    String? selectedReason;
+    final descriptionController = TextEditingController();
+    bool isOtherReason() => selectedReason == 'other';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(l10n.reportAction),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ...reasons.map(
+                      (reason) => RadioListTile<String>(
+                        value: reason['value']!,
+                        groupValue: selectedReason,
+                        onChanged: (value) => setState(() => selectedReason = value),
+                        title: Text(reason['label']!),
+                      ),
+                    ),
+                    if (isOtherReason())
+                      TextField(
+                        controller: descriptionController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          hintText: 'Expliquez brièvement la raison...',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: Text(l10n.cancel),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (selectedReason == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Veuillez choisir une raison.')),
+                      );
+                      return;
+                    }
+                    if (isOtherReason() && descriptionController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Veuillez ajouter une description.')),
+                      );
+                      return;
+                    }
+                    Navigator.pop(dialogContext, true);
+                  },
+                  child: Text(l10n.reportAction),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true || selectedReason == null) {
+      descriptionController.dispose();
+      return;
+    }
+
+    try {
+      await _confessionService.reportConfession(
+        confession.id,
+        reason: selectedReason,
+        description: descriptionController.text.trim().isEmpty
+            ? null
+            : descriptionController.text.trim(),
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Signalement envoyé')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: ${e.toString()}')),
+        );
+      }
+    } finally {
+      descriptionController.dispose();
+    }
   }
 
   void _confirmDelete(BuildContext context) {

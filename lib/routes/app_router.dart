@@ -57,6 +57,7 @@ import '../screens/monetization/earnings_screen.dart';
 import '../screens/premium/subscriptions_screen.dart';
 import '../screens/premium/premium_settings_screen.dart';
 import '../screens/confessions/confession_detail_screen.dart';
+import '../screens/promotions/promotions_screen.dart';
 import '../screens/search/search_screen.dart';
 import '../services/widgets/stories/story_reply_input.dart';
 import '../services/widgets/voice/voice_recorder_widget.dart';
@@ -326,6 +327,11 @@ class AppRouter {
           path: '/settings',
           name: 'settings',
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/promotions',
+          name: 'promotions',
+          builder: (context, state) => const PromotionsScreen(),
         ),
         GoRoute(
           path: '/subscriptions',
@@ -3107,8 +3113,7 @@ class _FollowersScreenState extends State<_FollowersScreen> {
         widget.username,
         page: loadMore ? _page : 1,
       );
-
-      final List<dynamic> data = response['data']['data'] ?? response['data'] ?? [];
+      final List<dynamic> data = _extractUsers(response);
       final newFollowers = data.map((json) => User.fromJson(json)).toList();
 
       setState(() {
@@ -3123,6 +3128,11 @@ class _FollowersScreenState extends State<_FollowersScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.errorMessage(e.toString()))),
+        );
+      }
       setState(() => _isLoading = false);
     }
   }
@@ -3203,6 +3213,18 @@ class _FollowersScreenState extends State<_FollowersScreen> {
       onTap: () => context.push('/u/${user.username}'),
     );
   }
+
+  List<dynamic> _extractUsers(Map<String, dynamic> response) {
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      final nested = data['data'];
+      if (nested is List) return nested;
+      if (data['followers'] is List) return data['followers'] as List;
+    }
+    if (data is List) return data;
+    if (response['followers'] is List) return response['followers'] as List;
+    return [];
+  }
 }
 
 /// Following Screen
@@ -3236,8 +3258,7 @@ class _FollowingScreenState extends State<_FollowingScreen> {
         widget.username,
         page: loadMore ? _page : 1,
       );
-
-      final List<dynamic> data = response['data']['data'] ?? response['data'] ?? [];
+      final List<dynamic> data = _extractUsers(response);
       final newFollowing = data.map((json) => User.fromJson(json)).toList();
 
       setState(() {
@@ -3252,6 +3273,11 @@ class _FollowingScreenState extends State<_FollowingScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.errorMessage(e.toString()))),
+        );
+      }
       setState(() => _isLoading = false);
     }
   }
@@ -3331,6 +3357,18 @@ class _FollowingScreenState extends State<_FollowingScreen> {
             ),
       onTap: () => context.push('/u/${user.username}'),
     );
+  }
+
+  List<dynamic> _extractUsers(Map<String, dynamic> response) {
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      final nested = data['data'];
+      if (nested is List) return nested;
+      if (data['following'] is List) return data['following'] as List;
+    }
+    if (data is List) return data;
+    if (response['following'] is List) return response['following'] as List;
+    return [];
   }
 }
 
@@ -3660,6 +3698,15 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
 
   Future<void> _sendMessage() async {
     final content = _messageController.text.trim();
+    final isOwnerOnly = _group?.onlyOwnerCanPost ?? false;
+    final canSend = !isOwnerOnly || (_currentUserId != null && _currentUserId == _group?.creatorId);
+
+    if (!canSend) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Seul le propriétaire du groupe peut écrire.')),
+      );
+      return;
+    }
 
     if (content.isEmpty && _selectedImage == null && _selectedVideo == null && _voiceFile == null) {
       return;
@@ -3742,6 +3789,8 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final isOwnerOnly = _group?.onlyOwnerCanPost ?? false;
+    final canSend = !isOwnerOnly || (_currentUserId != null && _currentUserId == _group?.creatorId);
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
@@ -4052,6 +4101,19 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
               ),
             ),
 
+          if (!canSend)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'Seul le propriétaire du groupe peut écrire.',
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+
           // Input area
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
@@ -4077,14 +4139,14 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                           Icons.image,
                           color: _selectedImage != null ? AppColors.primary : Colors.grey,
                         ),
-                        onPressed: _pickImage,
+                        onPressed: canSend ? _pickImage : null,
                       ),
                       IconButton(
                         icon: Icon(
                           Icons.videocam,
                           color: _selectedVideo != null ? AppColors.primary : Colors.grey,
                         ),
-                        onPressed: _pickVideo,
+                        onPressed: canSend ? _pickVideo : null,
                       ),
                       IconButton(
                         icon: Icon(
@@ -4092,6 +4154,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                           color: _showVoiceRecorder ? AppColors.primary : Colors.grey,
                         ),
                         onPressed: () {
+                          if (!canSend) return;
                           setState(() {
                             _showVoiceRecorder = !_showVoiceRecorder;
                           });
@@ -4100,10 +4163,13 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                       Expanded(
                         child: TextField(
                           controller: _messageController,
+                          enabled: canSend,
                           decoration: InputDecoration(
                             hintText: _editingMessageId != null
                                 ? l10n.editMessageHint
-                                : l10n.messageInputHint,
+                                : (canSend
+                                    ? l10n.messageInputHint
+                                    : 'Seul le propriétaire peut écrire.'),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(24),
                               borderSide: BorderSide.none,
@@ -4115,7 +4181,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                               vertical: 8,
                             ),
                           ),
-                          onSubmitted: (_) => _sendMessage(),
+                          onSubmitted: (_) => canSend ? _sendMessage() : null,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -4127,7 +4193,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                             )
                           : IconButton(
                               icon: const Icon(Icons.send, color: AppColors.primary),
-                              onPressed: _sendMessage,
+                              onPressed: canSend ? _sendMessage : null,
                             ),
                     ],
                   ),
@@ -4605,6 +4671,39 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                 onTap: () {
                   Navigator.pop(context);
                   _showEditGroupDialog();
+                },
+              ),
+            if (isAdmin)
+              SwitchListTile(
+                secondary: const Icon(Icons.lock_outline),
+                title: const Text('Seul le propriétaire peut écrire'),
+                value: _group?.onlyOwnerCanPost ?? false,
+                onChanged: (value) async {
+                  Navigator.pop(context);
+                  try {
+                    final updated = await _groupService.updateGroup(
+                      int.tryParse(widget.groupId) ?? 0,
+                      onlyOwnerCanPost: value,
+                    );
+                    setState(() {
+                      _group = updated;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          value
+                              ? 'Seul le propriétaire peut écrire.'
+                              : 'Les membres peuvent écrire.',
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(AppLocalizations.of(context)!.errorMessage(e.toString())),
+                      ),
+                    );
+                  }
                 },
               ),
             ListTile(
@@ -5432,6 +5531,8 @@ class _AnonymousMessageDetailScreenState extends State<_AnonymousMessageDetailSc
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final currentUserId = context.read<AuthProvider>().user?.id;
+    final isReceived = currentUserId != null && _message?.recipientId == currentUserId;
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.anonymousMessage),
@@ -5641,72 +5742,91 @@ class _AnonymousMessageDetailScreenState extends State<_AnonymousMessageDetailSc
 
                       const SizedBox(height: 16),
 
-                      // Reply section
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(Icons.reply, size: 20, color: AppColors.primary),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Répondre une fois',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
+                      if (isReceived)
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(Icons.reply, size: 20, color: AppColors.primary),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Répondre une fois',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Répondez à ce message pour démarrer une conversation dans le chat.',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: _replyController,
+                                  maxLines: 3,
+                                  decoration: InputDecoration(
+                                    hintText: 'Écrivez votre réponse...',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Répondez à ce message pour démarrer une conversation dans le chat.',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.textSecondary,
                                 ),
-                              ),
-                              const SizedBox(height: 16),
-                              TextField(
-                                controller: _replyController,
-                                maxLines: 3,
-                                decoration: InputDecoration(
-                                  hintText: 'Écrivez votre réponse...',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                const SizedBox(height: 12),
+                                Container(
+                                  width: double.infinity,
+                                  height: 52,
+                                  decoration: BoxDecoration(
+                                    gradient: !_isReplying ? AppColors.primaryGradient : null,
+                                    color: _isReplying ? Colors.grey[300] : null,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: _isReplying ? null : _replyOnce,
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Center(
+                                        child: _isReplying
+                                            ? const SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: const [
+                                                  Icon(Icons.send, color: Colors.white),
+                                                  SizedBox(width: 8),
+                                                  Text(
+                                                    'Répondre et démarrer la conversation',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: _isReplying ? null : _replyOnce,
-                                  icon: _isReplying
-                                      ? const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : const Icon(Icons.send),
-                                  label: Text(_isReplying ? 'Envoi...' : 'Répondre et démarrer la conversation'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                  ),
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
                       ],
                     ),
                   ),

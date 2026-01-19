@@ -125,7 +125,7 @@ class DeepLinkService {
 
   /// Generate a shareable link for a post
   static String getPostShareLink(int postId) {
-    return 'https://weylo.app/post/$postId';
+    return 'weylo://post/$postId';
   }
 
   /// Generate a shareable link for a user profile

@@ -20,6 +20,7 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   final PusherService _pusherService = PusherService();
+  late final List<Key> _screenKeys;
 
   final List<Widget> _screens = [
     const FeedScreen(),
@@ -32,6 +33,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
+    _screenKeys = List<Key>.generate(_screens.length, (_) => UniqueKey());
     _initializePusher();
   }
 
@@ -56,7 +58,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: List.generate(
+          _screens.length,
+          (index) => KeyedSubtree(
+            key: _screenKeys[index],
+            child: _screens[index],
+          ),
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -78,16 +86,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 Expanded(
                   child: _buildNavItem(
                     index: 0,
-                    icon: Icons.home_outlined,
-                    activeIcon: Icons.home,
+                    icon: Icons.home_rounded,
+                    activeIcon: Icons.home_rounded,
                     label: l10n.navFeedLabel,
                   ),
                 ),
                 Expanded(
                   child: _buildNavItem(
                     index: 1,
-                    icon: Icons.mail_outline,
-                    activeIcon: Icons.mail,
+                    icon: Icons.mark_email_unread_rounded,
+                    activeIcon: Icons.mark_email_unread_rounded,
                     label: l10n.navMessagesLabel,
                     showBadge: true,
                   ),
@@ -95,24 +103,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 Expanded(
                   child: _buildNavItem(
                     index: 2,
-                    icon: Icons.chat_bubble_outline,
-                    activeIcon: Icons.chat_bubble,
+                    icon: Icons.forum_rounded,
+                    activeIcon: Icons.forum_rounded,
                     label: l10n.navChatLabel,
                   ),
                 ),
                 Expanded(
                   child: _buildNavItem(
                     index: 3,
-                    icon: Icons.groups_outlined,
-                    activeIcon: Icons.groups,
+                    icon: Icons.group_rounded,
+                    activeIcon: Icons.group_rounded,
                     label: l10n.navGroupsLabel,
                   ),
                 ),
                 Expanded(
                   child: _buildNavItem(
                     index: 4,
-                    icon: Icons.person_outline,
-                    activeIcon: Icons.person,
+                    icon: Icons.account_circle_rounded,
+                    activeIcon: Icons.account_circle_rounded,
                     label: l10n.navProfileLabel,
                   ),
                 ),
@@ -132,10 +140,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     bool showBadge = false,
   }) {
     final isSelected = _currentIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selectedColor = isDark ? Colors.white : Colors.black87;
+    final unselectedColor = isDark ? Colors.white70 : Colors.grey.shade600;
 
     return GestureDetector(
       onTap: () {
         setState(() {
+          if (_currentIndex == index) {
+            _screenKeys[index] = UniqueKey();
+          }
           _currentIndex = index;
         });
       },
@@ -147,22 +161,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           children: [
             Stack(
               children: [
-                // Icône avec dégradé si sélectionnée
-                ShaderMask(
-                  shaderCallback: (Rect bounds) {
-                    if (isSelected) {
-                      return AppColors.primaryGradient.createShader(bounds);
-                    }
-                    return LinearGradient(
-                      colors: [AppColors.textSecondary, AppColors.textSecondary],
-                    ).createShader(bounds);
-                  },
-                  child: Icon(
-                    isSelected ? activeIcon : icon,
-                    color: Colors.white,
-                    size: 26,
-                    weight: 700, // Make icons bolder
-                  ),
+                Icon(
+                  isSelected ? activeIcon : icon,
+                  color: isSelected ? selectedColor : unselectedColor,
+                  size: 26,
+                  weight: 700,
                 ),
                 if (showBadge)
                   Positioned(
@@ -188,26 +191,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ],
             ),
             const SizedBox(height: 4),
-            // Texte avec dégradé si sélectionné
-            ShaderMask(
-              shaderCallback: (Rect bounds) {
-                if (isSelected) {
-                  return AppColors.primaryGradient.createShader(bounds);
-                }
-                return LinearGradient(
-                  colors: [AppColors.textSecondary, AppColors.textSecondary],
-                ).createShader(bounds);
-              },
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  color: Colors.white,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? selectedColor : unselectedColor,
               ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ],
         ),

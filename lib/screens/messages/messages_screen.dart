@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/message.dart';
-import '../../providers/auth_provider.dart';
 import '../../services/message_service.dart';
 import '../../services/widgets/common/widgets.dart';
 import '../../services/widgets/messages/message_card.dart';
@@ -85,25 +83,10 @@ class _MessagesScreenState extends State<MessagesScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final user = context.watch<AuthProvider>().user;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.messagesTitle),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {
-              if (user != null) {
-                final link = 'https://weylo.app/${user.username}';
-                Share.share(
-                  l10n.shareWebLinkMessage(link),
-                  subject: l10n.shareLinkSubject,
-                );
-              }
-            },
-          ),
-        ],
+        actions: [],
         bottom: TabBar(
           controller: _tabController,
           tabs: [
@@ -179,20 +162,7 @@ class _MessagesScreenState extends State<MessagesScreen> with SingleTickerProvid
       title: isReceived ? l10n.emptyInboxTitle : l10n.emptySentTitle,
       subtitle: isReceived ? l10n.emptyInboxSubtitle : l10n.emptySentSubtitle,
       buttonText: isReceived ? l10n.emptyInboxButton : l10n.emptySentButton,
-      onButtonPressed: () {
-        if (isReceived) {
-          final user = context.read<AuthProvider>().user;
-          if (user != null) {
-            final link = 'https://weylo.app/${user.username}';
-            Share.share(
-              l10n.shareWebLinkMessage(link),
-              subject: l10n.shareLinkSubject,
-            );
-          }
-        } else {
-          context.push('/send-message');
-        }
-      },
+      onButtonPressed: () => context.push('/send-message'),
     );
 
     return SmartRefresher(

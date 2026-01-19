@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:lottie/lottie.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import '../../core/constants/api_constants.dart';
@@ -653,6 +654,61 @@ class _ChatScreenState extends State<ChatScreen> {
                                       _pendingReplyPreview = null;
                                     });
                                   },
+                                  onDelete: isMe
+                                      ? () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (dialogContext) => AlertDialog(
+                                              title: Text(
+                                                AppLocalizations.of(dialogContext)!.deleteMessageTitle,
+                                              ),
+                                              content: Text(
+                                                AppLocalizations.of(dialogContext)!.deleteMessageConfirm,
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(dialogContext, false),
+                                                  child: Text(AppLocalizations.of(dialogContext)!.cancel),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(dialogContext, true),
+                                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                                  child: Text(AppLocalizations.of(dialogContext)!.deleteAction),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm != true) return;
+                                          try {
+                                            await _chatService.deleteMessage(
+                                              widget.conversationId,
+                                              message.id,
+                                            );
+                                            setState(() {
+                                              _messages.removeWhere((item) => item.id == message.id);
+                                            });
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    AppLocalizations.of(context)!.messageDeleted,
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          } catch (e) {
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    AppLocalizations.of(context)!.errorMessage(e.toString()),
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        }
+                                      : null,
                                 ),
                               );
                             },
@@ -1178,6 +1234,7 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback? onReply;
   final VoidCallback? onPlayVoice;
   final VoidCallback? onOpenVideo;
+  final VoidCallback? onDelete;
 
   const _MessageBubble({
     required this.message,
@@ -1190,6 +1247,7 @@ class _MessageBubble extends StatelessWidget {
     this.onReply,
     this.onPlayVoice,
     this.onOpenVideo,
+    this.onDelete,
   });
 
   @override
@@ -1235,6 +1293,8 @@ class _MessageBubble extends StatelessWidget {
                     ],
                   ),
                 ),
+              if (message.isGift)
+                _buildGiftPreview(context),
               if (message.hasImage && (mediaUrl ?? '').isNotEmpty)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
@@ -1405,6 +1465,109 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
+  Widget _buildGiftPreview(BuildContext context) {
+    final gift = message.gift;
+    final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/api/v1/?$'), '');
+
+    String resolveGiftUrl(String? url) {
+      if (url == null || url.isEmpty) return '';
+      final cleaned = url.replaceAll('\\', '/');
+      final baseUri = Uri.parse(base);
+      if (cleaned.startsWith('http')) {
+        final mediaUri = Uri.parse(cleaned);
+        if (mediaUri.host != baseUri.host || mediaUri.port != baseUri.port) {
+          final rewritten = mediaUri.replace(
+            scheme: baseUri.scheme,
+            host: baseUri.host,
+            port: baseUri.hasPort ? baseUri.port : null,
+          );
+          return Uri.encodeFull(rewritten.toString());
+        }
+        return Uri.encodeFull(cleaned);
+      }
+      if (cleaned.startsWith('//')) return Uri.encodeFull('https:$cleaned');
+      if (cleaned.startsWith('/storage/')) return Uri.encodeFull('$base$cleaned');
+      if (cleaned.startsWith('storage/')) return Uri.encodeFull('$base/$cleaned');
+      return Uri.encodeFull('$base/storage/$cleaned');
+    }
+
+    final animationUrl = resolveGiftUrl(gift?.animation);
+    final iconUrl = resolveGiftUrl(gift?.icon);
+
+    Widget media;
+    if (animationUrl.isNotEmpty) {
+      final lower = animationUrl.toLowerCase();
+      if (lower.endsWith('.json')) {
+        media = Lottie.network(
+          animationUrl,
+          width: 96,
+          height: 96,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => const Icon(
+            Icons.card_giftcard,
+            size: 48,
+          ),
+        );
+      } else {
+        media = CachedNetworkImage(
+          imageUrl: animationUrl,
+          width: 96,
+          height: 96,
+          fit: BoxFit.contain,
+          errorWidget: (context, url, error) => const Icon(Icons.card_giftcard, size: 48),
+        );
+      }
+    } else if (iconUrl.isNotEmpty) {
+      media = CachedNetworkImage(
+        imageUrl: iconUrl,
+        width: 72,
+        height: 72,
+        fit: BoxFit.contain,
+        errorWidget: (context, url, error) => const Icon(Icons.card_giftcard, size: 48),
+      );
+    } else {
+      media = const Icon(Icons.card_giftcard, size: 48);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isMe ? AppColors.primary.withOpacity(0.12) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider.withOpacity(0.6)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          media,
+          const SizedBox(width: 12),
+          if (gift != null)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    gift.name,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${gift.price.toInt()} FCFA',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   void _showMessageOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1420,6 +1583,18 @@ class _MessageBubble extends StatelessWidget {
                 onReply?.call();
               },
             ),
+            if (isMe)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: AppColors.error),
+                title: Text(
+                  AppLocalizations.of(sheetContext)!.deleteAction,
+                  style: const TextStyle(color: AppColors.error),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  onDelete?.call();
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.copy),
               title: Text(AppLocalizations.of(sheetContext)!.copyAction),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../services/deep_link_service.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
@@ -53,6 +54,9 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final actionColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : Colors.black87;
     return Scaffold(
       appBar: AppBar(
         title: ShaderMask(
@@ -69,29 +73,20 @@ class _FeedScreenState extends State<FeedScreen> {
         centerTitle: false,
         actions: [
           IconButton(
-            icon: ShaderMask(
-              shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
-              child: const Icon(Icons.search, color: Colors.white),
-            ),
+            icon: Icon(Icons.search, color: actionColor),
             onPressed: () {
               context.push('/search');
             },
             tooltip: l10n.searchAction,
           ),
           IconButton(
-            icon: ShaderMask(
-              shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
-              child: const Icon(Icons.add_box_outlined, color: Colors.white),
-            ),
+            icon: Icon(Icons.add_rounded, color: actionColor),
             onPressed: () {
               _showCreatePostSheet();
             },
           ),
           IconButton(
-            icon: ShaderMask(
-              shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
-              child: const Icon(Icons.notifications_outlined, color: Colors.white),
-            ),
+            icon: Icon(Icons.notifications_outlined, color: actionColor),
             onPressed: () {
               context.push('/notifications');
             },
@@ -228,7 +223,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   void _shareConfession(int confessionId) {
     final l10n = AppLocalizations.of(context)!;
-    final shareUrl = 'https://weylo.app/post/$confessionId';
+    final shareUrl = DeepLinkService.getPostShareLink(confessionId);
     Share.share(
       l10n.sharePostMessage(shareUrl),
       subject: l10n.sharePostSubject,

@@ -231,10 +231,15 @@ class ConfessionService {
     return Confession.fromJson(response.data['confession'] ?? response.data);
   }
 
-  Future<bool> reportConfession(int confessionId, {String? reason}) async {
+  Future<bool> reportConfession(int confessionId, {String? reason, String? description}) async {
+    final data = <String, dynamic>{};
+    if (reason != null) data['reason'] = reason;
+    if (description != null && description.isNotEmpty) {
+      data['description'] = description;
+    }
     final response = await _apiClient.post(
       '${ApiConstants.confessions}/$confessionId/report',
-      data: reason != null ? {'reason': reason} : null,
+      data: data.isNotEmpty ? data : null,
     );
     return response.data['success'] ?? true;
   }
@@ -325,6 +330,14 @@ class ConfessionService {
       '${ApiConstants.confessions}/$confessionId/view',
     );
     return response.data['views_count'] ?? 0;
+  }
+
+  Future<void> markPromotionImpression(int confessionId) async {
+    await _apiClient.post('${ApiConstants.confessions}/$confessionId/promotion-impression');
+  }
+
+  Future<void> markPromotionClick(int confessionId) async {
+    await _apiClient.post('${ApiConstants.confessions}/$confessionId/promotion-click');
   }
 
   Future<List<Confession>> searchConfessions(String query) async {

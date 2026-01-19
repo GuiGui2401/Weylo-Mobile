@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/constants/app_constants.dart';
 import '../../models/user.dart';
 import '../../models/conversation.dart';
 import '../../services/message_service.dart';
 import '../../services/user_service.dart';
 import '../../services/chat_service.dart';
+import '../../services/storage_service.dart';
 import '../../services/widgets/common/widgets.dart';
 import '../../services/widgets/voice/voice_recorder_widget.dart';
 import '../../services/voice_effects_service.dart';
@@ -28,6 +30,7 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   final UserService _userService = UserService();
   final ChatService _chatService = ChatService(debugLogs: true);
+  final StorageService _storage = StorageService();
 
   bool _isAnonymous = true;
   bool _isSending = false;
@@ -52,8 +55,19 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
     if (widget.recipientUsername.isNotEmpty) {
       _selectedRecipient = widget.recipientUsername;
     }
+    _loadAnonymousPreference();
     _loadUsers();
     _loadConversations();
+  }
+
+  Future<void> _loadAnonymousPreference() async {
+    final saved = await _storage.getBool(AppConstants.anonymousModeKey);
+    if (!mounted) return;
+    if (saved != null) {
+      setState(() {
+        _isAnonymous = saved;
+      });
+    }
   }
 
   @override
@@ -573,6 +587,7 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
                             setState(() {
                               _isAnonymous = value;
                             });
+                            _storage.setBool(AppConstants.anonymousModeKey, value);
                           },
                           activeColor: AppColors.primary,
                         ),

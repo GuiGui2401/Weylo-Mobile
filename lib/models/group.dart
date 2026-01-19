@@ -7,6 +7,7 @@ class Group {
   final int creatorId;
   final String inviteCode;
   final bool isPublic;
+  final bool onlyOwnerCanPost;
   final int maxMembers;
   final int membersCount;
   final String? avatarUrl;
@@ -24,6 +25,7 @@ class Group {
     required this.creatorId,
     required this.inviteCode,
     this.isPublic = false,
+    this.onlyOwnerCanPost = false,
     this.maxMembers = 50,
     this.membersCount = 0,
     this.avatarUrl,
@@ -45,6 +47,7 @@ class Group {
       creatorId: json['creator_id'] ?? json['creatorId'] ?? 0,
       inviteCode: json['invite_code'] ?? json['inviteCode'] ?? '',
       isPublic: json['is_public'] ?? json['isPublic'] ?? false,
+      onlyOwnerCanPost: json['only_owner_can_post'] ?? json['onlyOwnerCanPost'] ?? false,
       maxMembers: json['max_members'] ?? json['maxMembers'] ?? 50,
       membersCount: json['members_count'] ?? json['membersCount'] ?? 0,
       avatarUrl: json['avatar_url'] ?? json['avatarUrl'],
@@ -73,6 +76,7 @@ class Group {
       'creator_id': creatorId,
       'invite_code': inviteCode,
       'is_public': isPublic,
+      'only_owner_can_post': onlyOwnerCanPost,
       'max_members': maxMembers,
       'members_count': membersCount,
       'avatar_url': avatarUrl,

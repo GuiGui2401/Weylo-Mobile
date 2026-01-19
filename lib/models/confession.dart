@@ -20,6 +20,11 @@ class Confession {
   final int viewsCount;
   final int commentsCount;
   final bool isLiked;
+  final bool isSponsored;
+  final int? promotionId;
+  final String? promotionGoal;
+  final String? promotionCtaLabel;
+  final String? promotionWebsiteUrl;
   final User? author;
   final User? recipient;
   final List<ConfessionComment>? comments;
@@ -43,6 +48,11 @@ class Confession {
     this.viewsCount = 0,
     this.commentsCount = 0,
     this.isLiked = false,
+    this.isSponsored = false,
+    this.promotionId,
+    this.promotionGoal,
+    this.promotionCtaLabel,
+    this.promotionWebsiteUrl,
     this.author,
     this.recipient,
     this.comments,
@@ -100,6 +110,11 @@ class Confession {
       viewsCount: json['views_count'] ?? json['viewsCount'] ?? 0,
       commentsCount: json['comments_count'] ?? json['commentsCount'] ?? 0,
       isLiked: json['is_liked'] ?? json['isLiked'] ?? false,
+      isSponsored: json['is_sponsored'] ?? json['isSponsored'] ?? false,
+      promotionId: json['promotion_id'] ?? json['promotionId'],
+      promotionGoal: json['promotion']?['goal'] ?? json['promotion_goal'],
+      promotionCtaLabel: json['promotion']?['cta_label'] ?? json['promotion_cta_label'],
+      promotionWebsiteUrl: json['promotion']?['website_url'] ?? json['promotion_website_url'],
       author: json['author'] != null ? User.fromJson(json['author']) : null,
       recipient: json['recipient'] != null ? User.fromJson(json['recipient']) : null,
       comments: json['comments'] != null && json['comments'] is List
@@ -142,6 +157,12 @@ class Confession {
       'likes_count': likesCount,
       'views_count': viewsCount,
       'comments_count': commentsCount,
+      'is_liked': isLiked,
+      'is_sponsored': isSponsored,
+      'promotion_id': promotionId,
+      'promotion_goal': promotionGoal,
+      'promotion_cta_label': promotionCtaLabel,
+      'promotion_website_url': promotionWebsiteUrl,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
@@ -150,6 +171,11 @@ class Confession {
   Confession copyWith({
     int? likesCount,
     bool? isLiked,
+    bool? isSponsored,
+    int? promotionId,
+    String? promotionGoal,
+    String? promotionCtaLabel,
+    String? promotionWebsiteUrl,
     int? commentsCount,
     bool? isIdentityRevealed,
     String? imageUrl,
@@ -173,6 +199,11 @@ class Confession {
       viewsCount: viewsCount,
       commentsCount: commentsCount ?? this.commentsCount,
       isLiked: isLiked ?? this.isLiked,
+      isSponsored: isSponsored ?? this.isSponsored,
+      promotionId: promotionId ?? this.promotionId,
+      promotionGoal: promotionGoal ?? this.promotionGoal,
+      promotionCtaLabel: promotionCtaLabel ?? this.promotionCtaLabel,
+      promotionWebsiteUrl: promotionWebsiteUrl ?? this.promotionWebsiteUrl,
       author: author ?? this.author,
       recipient: recipient,
       comments: comments,

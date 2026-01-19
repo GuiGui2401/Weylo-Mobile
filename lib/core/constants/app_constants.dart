@@ -7,6 +7,7 @@ class AppConstants {
   static const String userKey = 'weylo_user';
   static const String themeKey = 'weylo_theme';
   static const String languageKey = 'weylo_language';
+  static const String anonymousModeKey = 'weylo_anonymous_mode';
   static const String fcmTokenKey = 'weylo_fcm_token';
   static const String onboardingKey = 'weylo_onboarding_completed';
 

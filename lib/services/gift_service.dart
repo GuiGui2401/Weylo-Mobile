@@ -31,7 +31,7 @@ class GiftService {
         ApiConstants.giftsReceived,
         queryParameters: {'page': page},
       );
-      final data = response.data['gifts'] ?? response.data['data'] ?? [];
+      final data = _extractTransactions(response.data);
       return (data as List).map((g) => GiftTransaction.fromJson(g)).toList();
     } catch (e) {
       // Return empty list if endpoint fails (e.g., 404 due to route conflict)
@@ -45,12 +45,22 @@ class GiftService {
         ApiConstants.giftsSent,
         queryParameters: {'page': page},
       );
-      final data = response.data['gifts'] ?? response.data['data'] ?? [];
+      final data = _extractTransactions(response.data);
       return (data as List).map((g) => GiftTransaction.fromJson(g)).toList();
     } catch (e) {
       // Return empty list if endpoint fails
       return [];
     }
+  }
+
+  List<dynamic> _extractTransactions(Map<String, dynamic> data) {
+    final payload = data['transactions'] ?? data['gifts'] ?? data['data'];
+    if (payload is Map<String, dynamic>) {
+      final nested = payload['data'];
+      if (nested is List) return nested;
+    }
+    if (payload is List) return payload;
+    return [];
   }
 
   Future<GiftTransaction> sendGift({

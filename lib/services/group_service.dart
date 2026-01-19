@@ -73,6 +73,7 @@ class GroupService {
     String? name,
     String? description,
     bool? isPublic,
+    bool? onlyOwnerCanPost,
     int? maxMembers,
     File? avatar,
   }) async {
@@ -80,6 +81,7 @@ class GroupService {
     if (name != null) data['name'] = name;
     if (description != null) data['description'] = description;
     if (isPublic != null) data['is_public'] = isPublic;
+    if (onlyOwnerCanPost != null) data['only_owner_can_post'] = onlyOwnerCanPost;
     if (maxMembers != null) data['max_members'] = maxMembers;
 
     if (avatar != null) {

@@ -435,6 +435,10 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
           width: 56,
           height: 56,
           fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => const Icon(
+            Icons.card_giftcard,
+            size: 48,
+          ),
         );
       }
       return CachedNetworkImage(
@@ -442,6 +446,7 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
         width: 56,
         height: 56,
         fit: BoxFit.contain,
+        errorWidget: (context, url, error) => const Icon(Icons.card_giftcard, size: 48),
       );
     }
 
@@ -451,6 +456,7 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
         width: 48,
         height: 48,
         fit: BoxFit.contain,
+        errorWidget: (context, url, error) => const Icon(Icons.card_giftcard, size: 48),
       );
     }
 

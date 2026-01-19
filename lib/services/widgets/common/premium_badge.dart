@@ -16,18 +16,10 @@ class VerifiedBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final badge = Container(
-      width: size,
-      height: size,
-      decoration: const BoxDecoration(
-        color: Color(0xFF1877F2), // Bleu Facebook
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        Icons.check,
-        size: size * 0.65,
-        color: Colors.white,
-      ),
+    final badge = Icon(
+      Icons.verified,
+      size: size,
+      color: const Color(0xFF1D9BF0),
     );
 
     if (showTooltip) {

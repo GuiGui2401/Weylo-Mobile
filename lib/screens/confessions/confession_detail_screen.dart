@@ -5,14 +5,19 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/confession.dart';
 import '../../services/confession_service.dart';
+import '../../services/deep_link_service.dart';
 import '../../services/widgets/common/avatar_widget.dart';
 import '../../services/widgets/common/link_text.dart';
+import '../../services/widgets/common/premium_badge.dart';
+import '../../providers/auth_provider.dart';
 
 class ConfessionDetailScreen extends StatefulWidget {
   final int confessionId;
@@ -231,7 +236,7 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
     if (_confession == null) return;
 
     final l10n = AppLocalizations.of(context)!;
-    final shareUrl = 'https://weylo.app/post/${_confession!.id}';
+    final shareUrl = DeepLinkService.getPostShareLink(_confession!.id);
     Share.share(
       l10n.sharePostMessage(shareUrl),
       subject: l10n.sharePostSubject,
@@ -316,6 +321,7 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
     final hasImage = confession.hasImage && imageUrl.isNotEmpty;
     final hasVideo = confession.hasVideo;
     final l10n = AppLocalizations.of(context)!;
+    final actionColor = _actionIconColor(context);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -357,26 +363,37 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
                           ),
                           if (confession.author?.isPremium == true) ...[
                             const SizedBox(width: 4),
-                            Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
-                                color: const Color(0xFF1877F2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.check,
-                                size: 10,
-                                color: Colors.white,
-                              ),
-                            ),
+                            const VerifiedBadge(size: 14),
                           ],
                         ],
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      Helpers.getTimeAgo(confession.createdAt),
-                      style: Theme.of(context).textTheme.bodySmall,
+                    Row(
+                      children: [
+                        Text(
+                          Helpers.getTimeAgo(confession.createdAt),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        if (confession.isSponsored) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'Sponsorisé',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.orange,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
@@ -482,6 +499,38 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
             ),
           ],
 
+          if (confession.isSponsored) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () async {
+                  await _confessionService.markPromotionClick(confession.id);
+                  final url = confession.promotionWebsiteUrl;
+                  if (url != null && url.isNotEmpty) {
+                    final uri = Uri.tryParse(url);
+                    if (uri != null) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      return;
+                    }
+                  }
+                  if (confession.author != null) {
+                    // ignore: use_build_context_synchronously
+                    context.push('/u/${confession.author!.username}');
+                  }
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(color: AppColors.primary.withOpacity(0.4)),
+                ),
+                child: Text(
+                  confession.promotionCtaLabel ?? 'Voir plus',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+
           const SizedBox(height: 16),
 
           // Stats row
@@ -518,21 +567,23 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildTwitterActionButton(
-                icon: confession.isLiked ? Icons.favorite : Icons.favorite_outline,
+                icon: confession.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                 label: l10n.likeAction,
-                color: confession.isLiked ? AppColors.error : null,
+                color: actionColor,
                 onTap: _toggleLike,
               ),
               _buildTwitterActionButton(
-                icon: Icons.mode_comment_outlined,
+                icon: Icons.mode_comment_rounded,
                 label: l10n.commentAction,
+                color: actionColor,
                 onTap: () {
                   FocusScope.of(context).requestFocus(FocusNode());
                 },
               ),
               _buildTwitterActionButton(
-                icon: Icons.share_outlined,
+                icon: Icons.share_rounded,
                 label: l10n.shareAction,
+                color: actionColor,
                 onTap: _shareConfession,
               ),
             ],
@@ -548,6 +599,7 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
     Color? color,
     VoidCallback? onTap,
   }) {
+    final fillColor = color ?? AppColors.textSecondary;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -558,22 +610,26 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
             Icon(
               icon,
               size: 18,
-              weight: 700,
-              color: color ?? AppColors.textSecondary,
+              color: fillColor,
             ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: color ?? AppColors.textSecondary,
+                color: fillColor,
                 fontSize: 13,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Color _actionIconColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? Colors.white70 : Colors.grey.shade600;
   }
 
   Widget _buildAvatar() {
@@ -724,9 +780,17 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
 
   Widget _buildCommentItem(ConfessionComment comment) {
     final l10n = AppLocalizations.of(context)!;
+    final currentUserId = context.read<AuthProvider>().user?.id;
+    final isMine = currentUserId != null && comment.user?.id == currentUserId;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
+      child: GestureDetector(
+        onLongPress: isMine
+            ? () {
+                _showCommentActions(comment);
+              }
+            : null,
+        child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GestureDetector(
@@ -761,18 +825,7 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
                     ),
                     if (comment.user?.isPremium == true) ...[
                       const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: const Color(0xFF1877F2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check,
-                          size: 8,
-                          color: Colors.white,
-                        ),
-                      ),
+                      const VerifiedBadge(size: 12),
                     ],
                     const Spacer(),
                     Text(
@@ -880,6 +933,75 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
             ),
           ),
         ],
+      ),
+      ),
+    );
+  }
+
+  Future<void> _showCommentActions(ConfessionComment comment) async {
+    final l10n = AppLocalizations.of(context)!;
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: AppColors.error),
+              title: Text(
+                l10n.deleteAction,
+                style: const TextStyle(color: AppColors.error),
+              ),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('Supprimer le commentaire'),
+                    content: const Text('Voulez-vous supprimer ce commentaire ?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        child: Text(l10n.cancel),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                        child: Text(l10n.deleteAction),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm != true) return;
+                try {
+                  await _confessionService.deleteComment(
+                    widget.confessionId,
+                    comment.id,
+                  );
+                  setState(() {
+                    _comments.removeWhere((c) => c.id == comment.id);
+                    if (_confession != null) {
+                      _confession = _confession!.copyWith(
+                        commentsCount: (_confession!.commentsCount - 1).clamp(0, 1 << 30),
+                      );
+                    }
+                  });
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Commentaire supprimé')),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.errorMessage(e.toString()))),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

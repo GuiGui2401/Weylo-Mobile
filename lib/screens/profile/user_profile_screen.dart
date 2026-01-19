@@ -4,16 +4,19 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:typed_data';
 import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:lottie/lottie.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/confession.dart';
+import '../../models/gift.dart';
 import '../../models/user.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/gift_service.dart';
 import '../../services/user_service.dart';
 import '../../services/widgets/common/loading_overlay.dart';
+import '../../services/widgets/common/premium_badge.dart';
 import '../messages/send_message_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -30,6 +33,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   late TabController _tabController;
   final UserService _userService = UserService();
   final Map<String, Future<Uint8List?>> _videoThumbnails = {};
+  bool _hasRefreshedOnOpen = false;
 
   @override
   void initState() {
@@ -38,6 +42,33 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProfileProvider>().loadProfile(widget.username);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (!_hasRefreshedOnOpen && (route?.isCurrent ?? false)) {
+      _hasRefreshedOnOpen = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.read<ProfileProvider>().loadProfile(widget.username);
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant UserProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.username != widget.username) {
+      _hasRefreshedOnOpen = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.read<ProfileProvider>().loadProfile(widget.username);
+        }
+      });
+    }
   }
 
   @override
@@ -147,9 +178,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             delegate: _SliverTabBarDelegate(
               TabBar(
                 controller: _tabController,
-                labelColor: AppColors.secondary,
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: AppColors.primary,
+                labelColor: Theme.of(context).colorScheme.primary,
+                unselectedLabelColor:
+                    Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey,
+                indicatorColor: Theme.of(context).colorScheme.primary,
                 tabs: [
                   Tab(text: l10n.profilePostsTab),
                   Tab(text: l10n.profileGiftsTab),
@@ -221,25 +253,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   Positioned(
                     bottom: 0,
                     right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check,
-                          size: 14,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+                    child: const VerifiedBadge(size: 18, showTooltip: false),
                   ),
               ],
             ),
@@ -792,7 +806,7 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_SliverTabBarDelegate oldDelegate) {
-    return false;
+    return true;
   }
 }
 
@@ -927,24 +941,15 @@ class _GiftsTabViewState extends State<_GiftsTabView> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (gift?.icon != null && gift!.icon.isNotEmpty)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: CachedNetworkImage(
-                      imageUrl: gift.icon,
-                      fit: BoxFit.contain,
-                      placeholder: (context, url) =>
-                          const CircularProgressIndicator(),
-                      errorWidget: (context, url, error) =>
-                          const Icon(Icons.card_giftcard, size: 40),
-                    ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: gift != null ? _buildGiftMedia(gift) : const Icon(
+                    Icons.card_giftcard,
+                    size: 40,
                   ),
-                )
-              else
-                const Expanded(
-                  child: Icon(Icons.card_giftcard, size: 40),
                 ),
+              ),
               const SizedBox(height: 4),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -973,5 +978,64 @@ class _GiftsTabViewState extends State<_GiftsTabView> {
         );
       },
     );
+  }
+
+  Widget _buildGiftMedia(Gift gift) {
+    final animationUrl = _resolveGiftUrl(gift.animation);
+    final iconUrl = _resolveGiftUrl(gift.icon);
+
+    if (animationUrl.isNotEmpty) {
+      final lower = animationUrl.toLowerCase();
+      if (lower.endsWith('.json')) {
+        return Lottie.network(
+          animationUrl,
+          fit: BoxFit.contain,
+        );
+      }
+      return CachedNetworkImage(
+        imageUrl: animationUrl,
+        fit: BoxFit.contain,
+        errorWidget: (context, url, error) => const Icon(Icons.card_giftcard, size: 40),
+      );
+    }
+
+    if (iconUrl.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: iconUrl,
+        fit: BoxFit.contain,
+        errorWidget: (context, url, error) => const Icon(Icons.card_giftcard, size: 40),
+      );
+    }
+
+    return const Icon(Icons.card_giftcard, size: 40);
+  }
+
+  String _resolveGiftUrl(String? url) {
+    if (url == null || url.isEmpty) return '';
+    final cleaned = url.replaceAll('\\', '/');
+    final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/api/v1/?$'), '');
+    final baseUri = Uri.parse(base);
+
+    if (cleaned.startsWith('http')) {
+      final mediaUri = Uri.parse(cleaned);
+      if (mediaUri.host != baseUri.host || mediaUri.port != baseUri.port) {
+        final rewritten = mediaUri.replace(
+          scheme: baseUri.scheme,
+          host: baseUri.host,
+          port: baseUri.hasPort ? baseUri.port : null,
+        );
+        return Uri.encodeFull(rewritten.toString());
+      }
+      return Uri.encodeFull(cleaned);
+    }
+    if (cleaned.startsWith('//')) return Uri.encodeFull('https:$cleaned');
+
+    if (cleaned.startsWith('/storage/')) {
+      return Uri.encodeFull('$base$cleaned');
+    }
+    if (cleaned.startsWith('storage/')) {
+      return Uri.encodeFull('$base/$cleaned');
+    }
+    return Uri.encodeFull('$base/storage/$cleaned');
   }
 }
