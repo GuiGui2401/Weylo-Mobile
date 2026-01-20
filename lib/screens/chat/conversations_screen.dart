@@ -143,6 +143,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
   void _sortConversations() {
     _conversations.sort((a, b) {
+      if (a.streakCount != b.streakCount) {
+        return b.streakCount.compareTo(a.streakCount);
+      }
       final aTime = a.lastMessageAt ?? a.updatedAt ?? a.createdAt;
       final bTime = b.lastMessageAt ?? b.updatedAt ?? b.createdAt;
       return bTime.compareTo(aTime);
@@ -377,7 +380,8 @@ class _ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentUserId = context.read<AuthProvider>().user?.id ?? 0;
     final otherUser = conversation.getOtherParticipant(currentUserId);
-    final flameEmoji = conversation.getFlameEmoji();
+    final streakCount = conversation.streakCount;
+    final showHourglass = _shouldShowHourglass();
 
     return ListTile(
       onTap: onTap,
@@ -425,18 +429,11 @@ class _ConversationTile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (flameEmoji.isNotEmpty) ...[
+          const SizedBox(width: 6),
+          _FlameBadge(count: streakCount),
+          if (showHourglass) ...[
             const SizedBox(width: 4),
-            Text(flameEmoji, style: const TextStyle(fontSize: 14)),
-            const SizedBox(width: 2),
-            Text(
-              '${conversation.streakCount}',
-              style: TextStyle(
-                fontSize: 12,
-                color: Helpers.getFlameColor(conversation.flameLevel.name),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            const _PulsingHourglassIcon(),
           ],
         ],
       ),
@@ -471,6 +468,17 @@ class _ConversationTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  bool _shouldShowHourglass() {
+    if (conversation.streakCount <= 0) return false;
+    final referenceTime =
+        conversation.lastMessageAt ??
+        conversation.updatedAt ??
+        conversation.createdAt;
+    final expiryTime = referenceTime.add(const Duration(hours: 24));
+    final remaining = expiryTime.difference(DateTime.now());
+    return remaining > Duration.zero && remaining <= const Duration(hours: 3);
   }
 }
 
@@ -555,6 +563,134 @@ class _StreakStatusIndicator extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _FlameBadge extends StatefulWidget {
+  const _FlameBadge({required this.count});
+
+  final int count;
+
+  @override
+  State<_FlameBadge> createState() => _FlameBadgeState();
+}
+
+class _FlameBadgeState extends State<_FlameBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 1.18)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 55,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.18, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 45,
+      ),
+    ]).animate(_controller);
+
+    if (_isMilestone(widget.count)) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _FlameBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.count != widget.count && _isMilestone(widget.count)) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  bool _isMilestone(int count) {
+    return count == 10 || count == 50 || count == 100;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final displayCount = widget.count < 0 ? 0 : widget.count;
+    return AnimatedBuilder(
+      animation: _scaleAnimation,
+      builder: (context, child) => Transform.scale(
+        scale: _scaleAnimation.value,
+        child: child,
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Icon(
+            Icons.local_fire_department_rounded,
+            size: 18,
+            color: Color(0xFFFF8A00),
+          ),
+          Positioned(
+            top: 6,
+            child: Text(
+              '$displayCount',
+              style: const TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PulsingHourglassIcon extends StatefulWidget {
+  const _PulsingHourglassIcon();
+
+  @override
+  State<_PulsingHourglassIcon> createState() => _PulsingHourglassIconState();
+}
+
+class _PulsingHourglassIconState extends State<_PulsingHourglassIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  late final Animation<double> _opacity = Tween<double>(begin: 0.4, end: 1.0).animate(
+    CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: const Icon(
+        Icons.hourglass_bottom,
+        size: 14,
+        color: AppColors.textSecondary,
+      ),
     );
   }
 }

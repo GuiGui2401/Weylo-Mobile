@@ -324,12 +324,8 @@ class _StoryCard extends StatelessWidget {
         width: 100,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          gradient: hasUnviewed ? AppColors.primaryGradient : null,
-          border: hasUnviewed
-              ? null
-              : Border.all(color: Colors.grey.shade400, width: 2),
         ),
-        padding: const EdgeInsets.all(3),
+        padding: EdgeInsets.zero,
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(13),

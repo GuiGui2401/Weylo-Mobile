@@ -10,6 +10,7 @@ import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/chat_service.dart';
 import '../../services/widgets/stories/stories_bar.dart';
 import '../../services/widgets/confessions/confession_card.dart';
 import '../../services/widgets/common/empty_state.dart';
@@ -26,6 +27,8 @@ class FeedScreen extends StatefulWidget {
 
 class _FeedScreenState extends State<FeedScreen> {
   final RefreshController _refreshController = RefreshController();
+  final ChatService _chatService = ChatService();
+  int _maxStreakCount = 0;
 
   @override
   void initState() {
@@ -33,6 +36,7 @@ class _FeedScreenState extends State<FeedScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<FeedProvider>().loadConfessions(refresh: true);
     });
+    _loadMaxStreak();
   }
 
   @override
@@ -43,12 +47,28 @@ class _FeedScreenState extends State<FeedScreen> {
 
   void _onRefresh() async {
     await context.read<FeedProvider>().refresh();
+    await _loadMaxStreak();
     _refreshController.refreshCompleted();
   }
 
   void _onLoading() async {
     await context.read<FeedProvider>().loadMore();
     _refreshController.loadComplete();
+  }
+
+  Future<void> _loadMaxStreak() async {
+    try {
+      final conversations = await _chatService.getConversations();
+      final maxStreak = conversations.fold<int>(
+        0,
+        (maxValue, conv) => conv.streakCount > maxValue ? conv.streakCount : maxValue,
+      );
+      if (mounted) {
+        setState(() {
+          _maxStreakCount = maxStreak;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -59,17 +79,24 @@ class _FeedScreenState extends State<FeedScreen> {
         : Colors.black87;
     return Scaffold(
       appBar: AppBar(
-        title: ShaderMask(
-          shaderCallback: (bounds) =>
-              AppColors.primaryGradient.createShader(bounds),
-          child: const Text(
-            'Weylo',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 24,
-              color: Colors.white,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ShaderMask(
+              shaderCallback: (bounds) =>
+                  AppColors.primaryGradient.createShader(bounds),
+              child: const Text(
+                'Weylo',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 24,
+                  color: Colors.white,
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            _FlameBadge(count: _maxStreakCount),
+          ],
         ),
         centerTitle: false,
         actions: [
@@ -233,6 +260,38 @@ class _FeedScreenState extends State<FeedScreen> {
       onPromoted: () {
         context.read<FeedProvider>().refresh();
       },
+    );
+  }
+}
+
+class _FlameBadge extends StatelessWidget {
+  const _FlameBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayCount = count < 0 ? 0 : count;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        const Icon(
+          Icons.local_fire_department_rounded,
+          size: 20,
+          color: Color(0xFFFF8A00),
+        ),
+        Positioned(
+          top: 7,
+          child: Text(
+            '$displayCount',
+            style: const TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

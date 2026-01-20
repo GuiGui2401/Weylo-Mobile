@@ -131,7 +131,12 @@ class MessageService {
     final response = await _apiClient.post(
       '${ApiConstants.messages}/$messageId/reveal',
     );
-    return AnonymousMessage.fromJson(response.data['message'] ?? response.data);
+    final data = response.data;
+    final payload = data is Map<String, dynamic> ? data['message'] ?? data['data'] : null;
+    if (payload is Map<String, dynamic>) {
+      return AnonymousMessage.fromJson(payload);
+    }
+    return getMessage(messageId);
   }
 
   Future<Map<String, dynamic>> startConversation(int messageId) async {
