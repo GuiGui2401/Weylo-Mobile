@@ -49,6 +49,7 @@ class _WalletScreenState extends State<WalletScreen>
         _walletService.getTransactions(),
         _walletService.getWithdrawals(),
         _walletService.getStats(),
+        _walletService.getWallet(),
       ]);
 
       setState(() {
@@ -57,11 +58,31 @@ class _WalletScreenState extends State<WalletScreen>
         _stats = results[2] as WalletStats;
         _isLoading = false;
       });
+
+      final walletResponse = results[3] as Map<String, dynamic>;
+      final walletBalance = _parseWalletBalance(walletResponse);
+      final authProvider = context.read<AuthProvider>();
+      final user = authProvider.user;
+      if (user != null && walletBalance != user.walletBalance) {
+        authProvider.updateUser(user.copyWith(walletBalance: walletBalance));
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
     }
+  }
+
+  double _parseWalletBalance(Map<String, dynamic> data) {
+    final wallet = data['wallet'];
+    final value = wallet is Map
+        ? wallet['balance']
+        : data['balance'] ?? data['wallet_balance'];
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
   }
 
   @override

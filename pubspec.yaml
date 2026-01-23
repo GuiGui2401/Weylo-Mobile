@@ -57,6 +57,7 @@ dependencies:
   firebase_core: ^4.3.0
   firebase_messaging: ^16.1.0
   flutter_local_notifications: ^19.5.0
+  flutter_uploader: ^3.0.0-beta.4
 
   # Utils
   intl: any
@@ -67,6 +68,7 @@ dependencies:
   package_info_plus: ^9.0.0
   connectivity_plus: ^7.0.0
   permission_handler: ^12.0.1
+  flutter_contacts: ^1.1.9
 
   # Animations
   flutter_staggered_animations: ^1.1.1
@@ -85,6 +87,9 @@ dependencies:
 
   # Emoji
   emoji_picker_flutter: ^4.4.0
+
+  # Phone input with country picker
+  intl_phone_field: ^3.2.0
 
   # Visibility
   visibility_detector: ^0.4.0+2

@@ -72,8 +72,15 @@ class PremiumService {
     return PremiumPassStatusResponse.fromJson(response.data);
   }
 
-  Future<PremiumPass> purchasePass() async {
-    final response = await _apiClient.post(ApiConstants.premiumPassPurchase);
+  Future<PremiumPass> purchasePass({String? plan}) async {
+    final data = <String, dynamic>{};
+    if (plan != null && plan.isNotEmpty) {
+      data['plan'] = plan;
+    }
+    final response = await _apiClient.post(
+      ApiConstants.premiumPassPurchase,
+      data: data.isEmpty ? null : data,
+    );
     return PremiumPass.fromJson(response.data['pass'] ?? response.data);
   }
 

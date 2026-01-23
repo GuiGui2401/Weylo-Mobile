@@ -15,6 +15,7 @@ class User {
   final String? email;
   final String? phone;
   final String? avatar;
+  final String? coverUrl;
   final String? bio;
   final double walletBalance;
   final bool isPremium;
@@ -25,6 +26,8 @@ class User {
   final String? fcmToken;
   final UserSettings? settings;
   final bool isIdentityRevealed;
+  final bool isOnline;
+  final DateTime? lastSeenAt;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final int followersCount;
@@ -43,6 +46,7 @@ class User {
     this.email,
     this.phone,
     this.avatar,
+    this.coverUrl,
     this.bio,
     this.walletBalance = 0.0,
     this.isPremium = false,
@@ -53,6 +57,8 @@ class User {
     this.fcmToken,
     this.settings,
     this.isIdentityRevealed = false,
+    this.isOnline = false,
+    this.lastSeenAt,
     this.createdAt,
     this.updatedAt,
     this.followersCount = 0,
@@ -103,6 +109,7 @@ class User {
       email: json['email'],
       phone: json['phone'],
       avatar: json['avatar'] ?? json['avatar_url'],
+      coverUrl: json['cover_url'] ?? json['cover'],
       bio: json['bio'],
       walletBalance: _parseDouble(
         json['wallet_balance'] ?? json['walletBalance'],
@@ -125,6 +132,10 @@ class User {
           : null,
       isIdentityRevealed:
           json['is_identity_revealed'] ?? json['isIdentityRevealed'] ?? false,
+      isOnline: json['is_online'] ?? json['isOnline'] ?? false,
+      lastSeenAt: json['last_seen_at'] != null
+          ? DateTime.tryParse(json['last_seen_at'])
+          : null,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : null,
@@ -151,6 +162,7 @@ class User {
       'email': email,
       'phone': phone,
       'avatar': avatar,
+      'cover_url': coverUrl,
       'bio': bio,
       'wallet_balance': walletBalance,
       'is_premium': isPremium,
@@ -161,6 +173,8 @@ class User {
       'fcm_token': fcmToken,
       'settings': settings?.toJson(),
       'is_identity_revealed': isIdentityRevealed,
+      'is_online': isOnline,
+      'last_seen_at': lastSeenAt?.toIso8601String(),
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
       'followers_count': followersCount,
@@ -181,6 +195,7 @@ class User {
     String? email,
     String? phone,
     String? avatar,
+    String? coverUrl,
     String? bio,
     double? walletBalance,
     bool? isPremium,
@@ -191,6 +206,8 @@ class User {
     String? fcmToken,
     UserSettings? settings,
     bool? isIdentityRevealed,
+    bool? isOnline,
+    DateTime? lastSeenAt,
     int? followersCount,
     int? followingCount,
     bool? isFollowing,
@@ -207,6 +224,7 @@ class User {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       avatar: avatar ?? this.avatar,
+      coverUrl: coverUrl ?? this.coverUrl,
       bio: bio ?? this.bio,
       walletBalance: walletBalance ?? this.walletBalance,
       isPremium: isPremium ?? this.isPremium,
@@ -217,6 +235,8 @@ class User {
       fcmToken: fcmToken ?? this.fcmToken,
       settings: settings ?? this.settings,
       isIdentityRevealed: isIdentityRevealed ?? this.isIdentityRevealed,
+      isOnline: isOnline ?? this.isOnline,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
       createdAt: createdAt,
       updatedAt: updatedAt,
       followersCount: followersCount ?? this.followersCount,
@@ -247,7 +267,7 @@ class UserSettings {
     this.emailNotifications = true,
     this.pushNotifications = true,
     this.showOnlineStatus = true,
-    this.allowAnonymousMessages = true,
+    this.allowAnonymousMessages = false,
     this.showNameOnPosts = true,
     this.showPhotoOnPosts = true,
     this.language = 'fr',
@@ -260,7 +280,7 @@ class UserSettings {
       emailNotifications: json['email_notifications'] ?? true,
       pushNotifications: json['push_notifications'] ?? true,
       showOnlineStatus: json['show_online_status'] ?? true,
-      allowAnonymousMessages: json['allow_anonymous_messages'] ?? true,
+      allowAnonymousMessages: json['allow_anonymous_messages'] ?? false,
       showNameOnPosts: json['show_name_on_posts'] ?? true,
       showPhotoOnPosts: json['show_photo_on_posts'] ?? true,
       language: json['language'] ?? 'fr',

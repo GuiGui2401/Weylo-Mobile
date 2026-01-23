@@ -54,9 +54,34 @@ class UserService {
       data: settings.toJson(),
     );
 
-    final user = User.fromJson(response.data['user'] ?? response.data);
-    await _storage.saveUser(user);
-    return user;
+    final data = response.data;
+    final payload = data is Map<String, dynamic>
+        ? (data['user'] ?? data['data'] ?? data['settings'])
+        : data;
+
+    if (payload is Map<String, dynamic> && payload.containsKey('id')) {
+      final user = User.fromJson(payload);
+      await _storage.saveUser(user);
+      return user;
+    }
+
+    final currentUser = await _storage.getUser();
+    if (payload is Map<String, dynamic> && currentUser != null) {
+      final updatedSettings = UserSettings.fromJson(payload);
+      final user = currentUser.copyWith(settings: updatedSettings);
+      await _storage.saveUser(user);
+      return user;
+    }
+
+    if (currentUser != null) {
+      final user = currentUser.copyWith(settings: settings);
+      await _storage.saveUser(user);
+      return user;
+    }
+
+    final fallback = User.fromJson(payload is Map<String, dynamic> ? payload : {});
+    await _storage.saveUser(fallback);
+    return fallback;
   }
 
   Future<bool> updatePassword({
@@ -84,6 +109,37 @@ class UserService {
       ApiConstants.userAvatar,
       data: formData,
     );
+    final avatarUrl =
+        response.data['avatar_url'] ?? response.data['avatar'] ?? null;
+    final currentUser = await _storage.getUser();
+    if (currentUser != null && avatarUrl is String) {
+      final updatedUser = currentUser.copyWith(avatar: avatarUrl);
+      await _storage.saveUser(updatedUser);
+      return updatedUser;
+    }
+
+    final user = User.fromJson(response.data['user'] ?? response.data);
+    await _storage.saveUser(user);
+    return user;
+  }
+
+  Future<User> uploadCover(String filePath) async {
+    final formData = FormData.fromMap({
+      'cover_image': await MultipartFile.fromFile(filePath),
+    });
+
+    final response = await _apiClient.uploadFile(
+      ApiConstants.userCover,
+      data: formData,
+    );
+    final coverUrl =
+        response.data['cover_url'] ?? response.data['cover'] ?? null;
+    final currentUser = await _storage.getUser();
+    if (currentUser != null && coverUrl is String) {
+      final updatedUser = currentUser.copyWith(coverUrl: coverUrl);
+      await _storage.saveUser(updatedUser);
+      return updatedUser;
+    }
 
     final user = User.fromJson(response.data['user'] ?? response.data);
     await _storage.saveUser(user);
@@ -92,6 +148,19 @@ class UserService {
 
   Future<bool> deleteAvatar() async {
     final response = await _apiClient.delete(ApiConstants.userAvatar);
+    final currentUser = await _storage.getUser();
+    if (currentUser != null) {
+      await _storage.saveUser(currentUser.copyWith(avatar: null));
+    }
+    return response.data['success'] ?? true;
+  }
+
+  Future<bool> deleteCover() async {
+    final response = await _apiClient.delete(ApiConstants.userCover);
+    final currentUser = await _storage.getUser();
+    if (currentUser != null) {
+      await _storage.saveUser(currentUser.copyWith(coverUrl: null));
+    }
     return response.data['success'] ?? true;
   }
 
@@ -164,6 +233,17 @@ class UserService {
     );
     final data = response.data['users'] ?? response.data['data'] ?? [];
     print("Fetched users: " + data.toString()); // Debug print
+    return (data as List).map((u) => User.fromJson(u)).toList();
+  }
+
+  Future<List<User>> getRecommendationsFromContacts(
+    List<String> phones,
+  ) async {
+    final response = await _apiClient.post(
+      ApiConstants.userRecommendationsFromContacts,
+      data: {'phones': phones},
+    );
+    final data = response.data['users'] ?? response.data['data'] ?? [];
     return (data as List).map((u) => User.fromJson(u)).toList();
   }
 }

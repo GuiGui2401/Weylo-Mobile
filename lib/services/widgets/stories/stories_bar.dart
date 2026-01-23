@@ -1,14 +1,18 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/story.dart';
 import '../../../providers/auth_provider.dart';
 import '../../story_service.dart';
 import '../common/avatar_widget.dart';
+
+final Map<String, Future<Uint8List?>> _storyVideoThumbCache = {};
 
 class StoriesBar extends StatefulWidget {
   const StoriesBar({super.key});
@@ -196,7 +200,11 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
               fit: StackFit.expand,
               children: [
                 // Background - dernière story ou avatar
-                if (lastStory != null && lastStory.mediaUrl != null)
+                if (lastStory != null && lastStory.isVideo)
+                  lastStory.thumbnailUrl != null
+                      ? _buildStoryVideoThumbnail(lastStory.thumbnailUrl!)
+                      : _buildStoryVideoThumbnailFromUrl(lastStory.mediaUrl)
+                else if (lastStory != null && lastStory.mediaUrl != null)
                   CachedNetworkImage(
                     imageUrl: lastStory.mediaUrl!,
                     fit: BoxFit.cover,
@@ -299,6 +307,8 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
       ),
     );
   }
+
+  
 }
 
 class _StoryCard extends StatelessWidget {
@@ -466,6 +476,16 @@ class _StoryCard extends StatelessWidget {
       );
     }
 
+    if (preview.type == 'video') {
+      if (preview.thumbnailUrl != null) {
+        return _buildStoryVideoThumbnail(preview.thumbnailUrl!);
+      }
+      if (preview.mediaUrl != null && preview.mediaUrl!.isNotEmpty) {
+        return _buildStoryVideoThumbnailFromUrl(preview.mediaUrl);
+      }
+      return _buildStoryVideoPlaceholder();
+    }
+
     if (preview.type == 'image' && preview.mediaUrl != null) {
       return CachedNetworkImage(
         imageUrl: preview.mediaUrl!,
@@ -506,4 +526,100 @@ class _StoryCard extends StatelessWidget {
       decoration: BoxDecoration(gradient: AppColors.primaryGradient),
     );
   }
+}
+
+Widget _buildStoryVideoThumbnail(String url) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Container(color: AppColors.shimmerBase),
+        errorWidget: (_, __, ___) => _buildStoryVideoPlaceholder(),
+      ),
+      Positioned(
+        top: 6,
+        right: 6,
+        child: Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.45),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.play_arrow,
+            size: 10,
+            color: Colors.white70,
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildStoryVideoThumbnailFromUrl(String? url) {
+  if (url == null || url.isEmpty) {
+    return _buildStoryVideoPlaceholder();
+  }
+
+  final future = _storyVideoThumbCache.putIfAbsent(
+    url,
+    () => VideoThumbnail.thumbnailData(
+      video: url,
+      imageFormat: ImageFormat.JPEG,
+      quality: 70,
+      maxWidth: 720,
+    ),
+  );
+
+  return FutureBuilder<Uint8List?>(
+    future: future,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.done &&
+          snapshot.data != null) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.memory(
+              snapshot.data!,
+              fit: BoxFit.cover,
+            ),
+            Positioned(
+              top: 6,
+              right: 6,
+              child: Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.45),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.play_arrow,
+                  size: 10,
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+      return _buildStoryVideoPlaceholder();
+    },
+  );
+}
+
+Widget _buildStoryVideoPlaceholder() {
+  return Container(
+    color: Colors.black,
+    child: const Center(
+      child: Icon(
+        Icons.play_circle_fill,
+        color: Colors.white,
+        size: 42,
+      ),
+    ),
+  );
 }

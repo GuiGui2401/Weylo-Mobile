@@ -70,25 +70,30 @@ class Conversation {
   String getFlameEmoji() {
     switch (flameLevel) {
       case FlameLevel.yellow:
-        return '🔥';
       case FlameLevel.orange:
-        return '🔥🔥';
       case FlameLevel.purple:
-        return '💜🔥';
+        return '🔥';
       default:
         return '';
     }
   }
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
+    final streakData = json['streak'] is Map<String, dynamic>
+        ? json['streak'] as Map<String, dynamic>
+        : null;
+    final streakCount =
+        streakData != null ? streakData['count'] : json['streak_count'];
+    final streakLevel =
+        streakData != null ? streakData['flame_level'] : json['flame_level'];
     return Conversation(
       id: json['id'] ?? 0,
       participantOneId:
           json['participant_one_id'] ?? json['participantOneId'] ?? 0,
       participantTwoId:
           json['participant_two_id'] ?? json['participantTwoId'] ?? 0,
-      streakCount: json['streak_count'] ?? json['streakCount'] ?? 0,
-      flameLevel: _parseFlameLevel(json['flame_level'] ?? json['flameLevel']),
+      streakCount: streakCount ?? json['streakCount'] ?? 0,
+      flameLevel: _parseFlameLevel(streakLevel ?? json['flameLevel']),
       messageCount: json['message_count'] ?? json['messageCount'] ?? 0,
       lastMessageAt: json['last_message_at'] != null
           ? DateTime.parse(json['last_message_at'])

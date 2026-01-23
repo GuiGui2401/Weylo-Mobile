@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/errors/exceptions.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/confession.dart';
@@ -45,6 +46,8 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
   File? _selectedCommentImage;
   ConfessionComment? _replyToComment;
   String? _error;
+  final Set<int> _commentLikeLoading = {};
+  final Set<int> _commentLikeAnimating = {};
 
   @override
   void initState() {
@@ -242,15 +245,25 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
     }
   }
 
-  void _shareConfession() {
+  Future<void> _shareConfession() async {
     if (_confession == null) return;
 
     final l10n = AppLocalizations.of(context)!;
     final shareUrl = DeepLinkService.getPostShareLink(_confession!.id);
-    Share.share(
+    await Share.share(
       l10n.sharePostMessage(shareUrl),
       subject: l10n.sharePostSubject,
     );
+    try {
+      final sharesCount = await _confessionService.shareConfession(
+        _confession!.id,
+      );
+      if (mounted) {
+        setState(() {
+          _confession = _confession!.copyWith(sharesCount: sharesCount);
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -329,6 +342,9 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
     final hasVideo = confession.hasVideo;
     final l10n = AppLocalizations.of(context)!;
     final actionColor = _actionIconColor(context);
+    final currentUserId = context.read<AuthProvider>().user?.id;
+    final isOwnPost = currentUserId != null && confession.authorId == currentUserId;
+    final canShowAuthor = confession.isIdentityRevealed || isOwnPost;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -340,8 +356,7 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
             children: [
               GestureDetector(
                 onTap: () {
-                  if (confession.isIdentityRevealed &&
-                      confession.author != null) {
+                  if (canShowAuthor && confession.author != null) {
                     context.push('/u/${confession.author!.username}');
                   }
                 },
@@ -354,16 +369,14 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
                   children: [
                     GestureDetector(
                       onTap: () {
-                        if (confession.isIdentityRevealed &&
-                            confession.author != null) {
+                        if (canShowAuthor && confession.author != null) {
                           context.push('/u/${confession.author!.username}');
                         }
                       },
                       child: Row(
                         children: [
                           Text(
-                            confession.isIdentityRevealed &&
-                                    confession.author != null
+                            canShowAuthor && confession.author != null
                                 ? confession.author!.fullName
                                 : l10n.userAnonymous,
                             style: const TextStyle(
@@ -796,6 +809,9 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
     final l10n = AppLocalizations.of(context)!;
     final currentUserId = context.read<AuthProvider>().user?.id;
     final isMine = currentUserId != null && comment.user?.id == currentUserId;
+    final resolvedMediaUrl = _resolveMediaUrl(
+      comment.mediaFullUrl ?? comment.mediaUrl,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: GestureDetector(
@@ -904,13 +920,12 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
                     comment.content,
                     style: const TextStyle(fontSize: 14, height: 1.4),
                   ),
-                if (comment.mediaFullUrl != null ||
-                    comment.mediaUrl != null) ...[
+                if (resolvedMediaUrl.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: CachedNetworkImage(
-                      imageUrl: comment.mediaFullUrl ?? comment.mediaUrl ?? '',
+                      imageUrl: resolvedMediaUrl,
                       width: double.infinity,
                       height: 200,
                       fit: BoxFit.cover,
@@ -933,20 +948,71 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
                   ),
                 ],
                 const SizedBox(height: 6),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _replyToComment = comment;
-                    });
-                  },
-                  child: Text(
-                    l10n.replyAction,
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => _toggleCommentLike(comment),
+                      child: Row(
+                        children: [
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Icon(
+                                comment.isLiked
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                size: 18,
+                                color: comment.isLiked
+                                    ? Colors.redAccent
+                                    : Colors.grey[600],
+                              ),
+                              if (_commentLikeAnimating.contains(comment.id))
+                                TweenAnimationBuilder<double>(
+                                  tween: Tween(begin: 0.6, end: 1.2),
+                                  duration: const Duration(milliseconds: 260),
+                                  curve: Curves.easeOutBack,
+                                  builder: (context, scale, child) =>
+                                      Transform.scale(
+                                    scale: scale,
+                                    child: child,
+                                  ),
+                                  child: const Icon(
+                                    Icons.favorite,
+                                    size: 18,
+                                    color: Colors.redAccent,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${comment.likesCount}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 16),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _replyToComment = comment;
+                        });
+                      },
+                      child: Text(
+                        l10n.replyAction,
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -955,6 +1021,70 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
       ),
       ),
     );
+  }
+
+  Future<void> _toggleCommentLike(ConfessionComment comment) async {
+    if (_confession == null || _commentLikeLoading.contains(comment.id)) {
+      return;
+    }
+
+    setState(() {
+      _commentLikeLoading.add(comment.id);
+    });
+
+    try {
+      if (!comment.isLiked) {
+        setState(() {
+          _commentLikeAnimating.add(comment.id);
+        });
+        Future.delayed(const Duration(milliseconds: 320), () {
+          if (!mounted) return;
+          setState(() {
+            _commentLikeAnimating.remove(comment.id);
+          });
+        });
+      }
+
+      final response = comment.isLiked
+          ? await _confessionService.unlikeComment(
+              _confession!.id,
+              comment.id,
+            )
+          : await _confessionService.likeComment(
+              _confession!.id,
+              comment.id,
+            );
+
+      final likesCount =
+          response['likes_count'] ?? response['likesCount'] ?? comment.likesCount;
+      final isLiked = response['is_liked'] ?? response['isLiked'] ?? !comment.isLiked;
+
+      setState(() {
+        _comments = _comments
+            .map(
+              (c) => c.id == comment.id
+                  ? c.copyWith(likesCount: likesCount, isLiked: isLiked)
+                  : c,
+            )
+            .toList();
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.errorMessage(e.toString()),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _commentLikeLoading.remove(comment.id);
+        });
+      }
+    }
   }
 
   Future<void> _showCommentActions(ConfessionComment comment) async {
@@ -1401,12 +1531,23 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // Fermer le loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.errorMessage(e.toString())),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (e is AppException && e.statusCode == 402) {
+          final requiredAmount = Helpers.extractRequiredAmount(e.data);
+          Helpers.showErrorSnackBar(
+            context,
+            Helpers.insufficientBalanceMessage(
+              requiredAmount: requiredAmount,
+            ),
+          );
+          context.push('/wallet');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.errorMessage(e.toString())),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }

@@ -12,6 +12,9 @@ import 'providers/profile_provider.dart';
 import 'providers/wallet_provider.dart';
 import 'routes/app_router.dart';
 import 'services/deep_link_service.dart';
+import 'services/local_notification_service.dart';
+import 'services/story_background_uploader.dart';
+import 'services/story_upload_fallback_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +34,10 @@ void main() async {
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
+
+  await LocalNotificationService.initialize();
+  await StoryBackgroundUploader.initialize();
+  StoryUploadFallbackService().resumePendingUploads();
 
   runApp(const WeyloApp());
 }

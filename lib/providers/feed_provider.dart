@@ -1,22 +1,34 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/confession.dart';
+import '../models/user.dart';
 import '../services/confession_service.dart';
 import '../services/pusher_service.dart';
+import '../services/user_service.dart';
 
 class FeedProvider extends ChangeNotifier {
   final ConfessionService _confessionService = ConfessionService();
   final PusherService _pusherService = PusherService();
+  final UserService _userService = UserService();
 
   List<Confession> _confessions = [];
+  List<User> _contactRecommendations = [];
   bool _isLoading = false;
+  bool _isLoadingRecommendations = false;
   bool _hasMore = true;
   int _currentPage = 1;
   String? _error;
+  String? _recommendationsError;
+  bool _contactsPermissionDenied = false;
 
   List<Confession> get confessions => _confessions;
+  List<User> get contactRecommendations => _contactRecommendations;
   bool get isLoading => _isLoading;
+  bool get isLoadingRecommendations => _isLoadingRecommendations;
   bool get hasMore => _hasMore;
   String? get error => _error;
+  String? get recommendationsError => _recommendationsError;
+  bool get contactsPermissionDenied => _contactsPermissionDenied;
 
   FeedProvider() {
     _setupRealTimeUpdates();
@@ -80,6 +92,47 @@ class FeedProvider extends ChangeNotifier {
       if (kDebugMode) print('Error loading confessions: $e');
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadContactRecommendations({bool requestPermission = false}) async {
+    if (_isLoadingRecommendations) return;
+
+    _isLoadingRecommendations = true;
+    _recommendationsError = null;
+    notifyListeners();
+
+    try {
+      bool hasPermission = await FlutterContacts.requestPermission(
+        readonly: true,
+      );
+      if (!hasPermission) {
+        _contactsPermissionDenied = true;
+        _contactRecommendations = [];
+        return;
+      }
+      _contactsPermissionDenied = false;
+
+      final contacts = await FlutterContacts.getContacts(withProperties: true);
+      final phones = contacts
+          .expand((contact) => contact.phones)
+          .map((phone) => phone.number)
+          .where((number) => number.trim().isNotEmpty)
+          .toList();
+
+      if (phones.isEmpty) {
+        _contactRecommendations = [];
+        return;
+      }
+
+      _contactRecommendations =
+          await _userService.getRecommendationsFromContacts(phones);
+    } catch (e) {
+      _recommendationsError = e.toString();
+      if (kDebugMode) print('Error loading recommendations: $e');
+    } finally {
+      _isLoadingRecommendations = false;
       notifyListeners();
     }
   }

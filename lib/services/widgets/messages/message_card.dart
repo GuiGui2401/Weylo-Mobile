@@ -226,12 +226,20 @@ class _PulsingAvatarPlaceholderState extends State<_PulsingAvatarPlaceholder>
     return AnimatedBuilder(
       animation: _pulse,
       builder: (context, child) {
+        final opacity = 0.65 + _pulse.value * 0.25;
         return Container(
           width: 48,
           height: 48,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.grey.withOpacity(0.3 + _pulse.value * 0.4),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary.withOpacity(opacity),
+                AppColors.secondary.withOpacity(opacity),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
           child: Center(
             child: Text(

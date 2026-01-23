@@ -86,7 +86,10 @@ class _MessagesScreenState extends State<MessagesScreen>
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.messagesTitle),
+        title: Text(
+          l10n.messagesTitle,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         actions: [],
         bottom: TabBar(
           controller: _tabController,
@@ -124,35 +127,48 @@ class _MessagesScreenState extends State<MessagesScreen>
           ],
         ),
       ),
-      body: _isLoading
-          ? const LoadingWidget()
-          : _hasError
-          ? ErrorState(onRetry: _loadData)
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildMessagesList(_receivedMessages, isReceived: true),
-                _buildMessagesList(_sentMessages, isReceived: false),
-              ],
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/fond.png'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: _isLoading
+            ? const LoadingWidget()
+            : _hasError
+            ? ErrorState(onRetry: _loadData)
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildMessagesList(_receivedMessages, isReceived: true),
+                  _buildMessagesList(_sentMessages, isReceived: false),
+                ],
+              ),
+      ),
       floatingActionButton: Container(
-        decoration: BoxDecoration(
-          gradient: AppColors.primaryGradient,
+        width: 56,
+        height: 56,
+        decoration: const BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.4),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: Colors.black26,
+              blurRadius: 10,
+              offset: Offset(0, 4),
             ),
           ],
         ),
         child: FloatingActionButton(
           heroTag: 'messages_fab',
           onPressed: () => context.push('/send-message'),
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.grey.shade300,
           elevation: 0,
-          child: const Icon(Icons.edit, color: Colors.white),
+          shape: const CircleBorder(),
+          child: Icon(
+            Icons.edit,
+            color: Colors.grey.shade700,
+          ),
         ),
       ),
     );

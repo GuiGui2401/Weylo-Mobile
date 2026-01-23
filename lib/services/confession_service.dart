@@ -242,6 +242,13 @@ class ConfessionService {
     return Confession.fromJson(response.data['confession'] ?? response.data);
   }
 
+  Future<int> shareConfession(int confessionId) async {
+    final response = await _apiClient.post(
+      '${ApiConstants.confessions}/$confessionId/share',
+    );
+    return response.data['shares_count'] ?? 0;
+  }
+
   Future<bool> reportConfession(int confessionId, {String? reason, String? description}) async {
     final data = <String, dynamic>{};
     if (reason != null) data['reason'] = reason;
@@ -330,6 +337,23 @@ class ConfessionService {
       '${ApiConstants.confessions}/$confessionId/comments/$commentId',
     );
     return response.data['success'] ?? true;
+  }
+
+  Future<Map<String, dynamic>> likeComment(int confessionId, int commentId) async {
+    final response = await _apiClient.post(
+      '${ApiConstants.confessions}/$confessionId/comments/$commentId/like',
+    );
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> unlikeComment(
+    int confessionId,
+    int commentId,
+  ) async {
+    final response = await _apiClient.delete(
+      '${ApiConstants.confessions}/$confessionId/comments/$commentId/like',
+    );
+    return response.data;
   }
 
   Future<bool> deleteConfession(int confessionId) async {

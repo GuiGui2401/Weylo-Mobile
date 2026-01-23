@@ -9,6 +9,7 @@ class Story {
   final int userId;
   final StoryType type;
   final String? mediaUrl;
+  final String? thumbnailUrl;
   final String? content;
   final int duration;
   final StoryStatus status;
@@ -18,6 +19,7 @@ class Story {
   final User? user;
   final List<StoryView>? viewers;
   final bool isViewed;
+  final bool hasViewerSubscription;
   final DateTime createdAt;
 
   Story({
@@ -25,6 +27,7 @@ class Story {
     required this.userId,
     this.type = StoryType.text,
     this.mediaUrl,
+    this.thumbnailUrl,
     this.content,
     this.duration = 5,
     this.status = StoryStatus.active,
@@ -34,6 +37,7 @@ class Story {
     this.user,
     this.viewers,
     this.isViewed = false,
+    this.hasViewerSubscription = false,
     required this.createdAt,
   });
 
@@ -49,6 +53,7 @@ class Story {
       userId: json['user_id'] ?? json['userId'] ?? 0,
       type: _parseType(json['type']),
       mediaUrl: json['media_url'] ?? json['mediaUrl'],
+      thumbnailUrl: json['thumbnail_url'] ?? json['thumbnailUrl'],
       content: json['content'],
       duration: json['duration'] ?? 5,
       status: json['status'] == 'expired'
@@ -64,6 +69,8 @@ class Story {
           ? (json['viewers'] as List).map((v) => StoryView.fromJson(v)).toList()
           : null,
       isViewed: json['is_viewed'] ?? json['isViewed'] ?? false,
+      hasViewerSubscription:
+          json['has_viewer_subscription'] ?? json['hasViewerSubscription'] ?? false,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -87,6 +94,7 @@ class Story {
       'user_id': userId,
       'type': type.name,
       'media_url': mediaUrl,
+      'thumbnail_url': thumbnailUrl,
       'content': content,
       'duration': duration,
       'status': status.name,
@@ -114,11 +122,19 @@ class StoryView {
   });
 
   factory StoryView.fromJson(Map<String, dynamic> json) {
+    final userPayload = json['user'] ??
+        {
+          'id': json['id'] ?? json['user_id'] ?? 0,
+          'full_name': json['full_name'] ?? json['name'] ?? 'Anonyme',
+          'username': json['username'] ?? '',
+          'avatar_url': json['avatar_url'],
+          'is_premium': json['is_premium'] ?? false,
+        };
     return StoryView(
       id: json['id'] ?? 0,
       storyId: json['story_id'] ?? json['storyId'] ?? 0,
-      userId: json['user_id'] ?? json['userId'] ?? 0,
-      user: json['user'] != null ? User.fromJson(json['user']) : null,
+      userId: json['user_id'] ?? json['userId'] ?? json['id'] ?? 0,
+      user: User.fromJson(userPayload),
       viewedAt: json['viewed_at'] != null
           ? DateTime.parse(json['viewed_at'])
           : DateTime.now(),
@@ -129,12 +145,14 @@ class StoryView {
 class StoryPreview {
   final String type;
   final String? mediaUrl;
+  final String? thumbnailUrl;
   final String? content;
   final String? backgroundColor;
 
   StoryPreview({
     required this.type,
     this.mediaUrl,
+    this.thumbnailUrl,
     this.content,
     this.backgroundColor,
   });
@@ -143,6 +161,7 @@ class StoryPreview {
     return StoryPreview(
       type: json['type'] ?? 'text',
       mediaUrl: json['media_url'] ?? json['mediaUrl'],
+      thumbnailUrl: json['thumbnail_url'] ?? json['thumbnailUrl'],
       content: json['content'],
       backgroundColor: json['background_color'] ?? json['backgroundColor'],
     );

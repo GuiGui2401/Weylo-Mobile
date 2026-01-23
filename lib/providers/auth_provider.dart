@@ -203,9 +203,7 @@ class AuthProvider extends ChangeNotifier {
           settings['push_notifications'] ?? currentSettings.pushNotifications,
       showOnlineStatus:
           settings['show_online_status'] ?? currentSettings.showOnlineStatus,
-      allowAnonymousMessages:
-          settings['allow_anonymous_messages'] ??
-          currentSettings.allowAnonymousMessages,
+      allowAnonymousMessages: false,
       showNameOnPosts:
           settings['show_name_on_posts'] ?? currentSettings.showNameOnPosts,
       showPhotoOnPosts:

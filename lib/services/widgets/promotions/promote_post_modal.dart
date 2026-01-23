@@ -66,6 +66,23 @@ class _PromotePostModalState extends State<PromotePostModal> with SingleTickerPr
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _languageController = TextEditingController();
   final TextEditingController _budgetController = TextEditingController();
+  final List<String> _websiteCtaOptions = const [
+    'Consulter le site',
+    'Acheter maintenant',
+    'Inscription',
+    'Contacte-nous',
+    'Postuler maintenant',
+    'Réserver maintenant',
+    'Faire un don',
+    'Télécharger',
+    'Heure de la demande',
+    'Voir le menu',
+    'Regarder plus',
+    'Appeler',
+    'Appel à l\'action',
+    'En savoir plus',
+  ];
+  String? _selectedWebsiteCta;
 
   late PageController _pageController;
   late AnimationController _animationController;
@@ -221,6 +238,10 @@ class _PromotePostModalState extends State<PromotePostModal> with SingleTickerPr
             _websiteController.text.trim().isEmpty) {
           return false;
         }
+        if (_selectedGoal == PromotionGoal.website &&
+            (_selectedWebsiteCta == null || _selectedWebsiteCta!.trim().isEmpty)) {
+          return false;
+        }
         return true;
       default:
         return false;
@@ -326,7 +347,7 @@ class _PromotePostModalState extends State<PromotePostModal> with SingleTickerPr
       case PromotionGoal.messages:
         return 'Envoyer un message';
       case PromotionGoal.website:
-        return 'Visiter le site';
+        return _selectedWebsiteCta ?? 'Consulter le site';
       case PromotionGoal.conversions:
         return 'Acheter';
       case PromotionGoal.videoViews:
@@ -566,7 +587,14 @@ class _PromotePostModalState extends State<PromotePostModal> with SingleTickerPr
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isSelected = _selectedGoal == goal;
     return GestureDetector(
-      onTap: () => setState(() => _selectedGoal = goal),
+      onTap: () {
+        setState(() {
+          _selectedGoal = goal;
+          if (goal == PromotionGoal.website) {
+            _selectedWebsiteCta ??= _websiteCtaOptions.first;
+          }
+        });
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 12),
@@ -869,12 +897,40 @@ class _PromotePostModalState extends State<PromotePostModal> with SingleTickerPr
             cpv: estimates['cpv'],
           ),
           const SizedBox(height: 12),
+          const Text(
+            'Aperçu dans le feed',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          _buildAdPreviewCard(previewUrl),
+          const SizedBox(height: 16),
           SwitchListTile(
             value: _brandedContent,
             onChanged: (value) => setState(() => _brandedContent = value),
             title: const Text('Contenu de marque'),
             subtitle: const Text('Obligatoire si contenu sponsorisé'),
           ),
+          if (_selectedGoal == PromotionGoal.website)
+            DropdownButtonFormField<String>(
+              value: _selectedWebsiteCta ?? _websiteCtaOptions.first,
+              decoration: const InputDecoration(
+                labelText: 'Texte du bouton',
+                border: OutlineInputBorder(),
+              ),
+              items: _websiteCtaOptions
+                  .map(
+                    (option) => DropdownMenuItem<String>(
+                      value: option,
+                      child: Text(option),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() {
+                _selectedWebsiteCta = value;
+              }),
+            ),
+          if (_selectedGoal == PromotionGoal.website)
+            const SizedBox(height: 12),
           if (_selectedGoal == PromotionGoal.website)
             TextField(
               controller: _websiteController,
@@ -904,6 +960,85 @@ class _PromotePostModalState extends State<PromotePostModal> with SingleTickerPr
             selected: _paymentMethod == PaymentMethod.card,
             onTap: () => setState(() => _paymentMethod = PaymentMethod.card),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdPreviewCard(String previewUrl) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ctaLabel = _ctaLabel();
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : Colors.grey.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              height: 180,
+              width: double.infinity,
+              child: _buildVideoThumb(previewUrl),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Sponsorisé',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (ctaLabel.isNotEmpty)
+                TextButton(
+                  onPressed: () {},
+                  style: TextButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(ctaLabel),
+                ),
+            ],
+          ),
+          if (_selectedGoal == PromotionGoal.website &&
+              _websiteController.text.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                _websiteController.text.trim(),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
         ],
       ),
     );

@@ -76,6 +76,19 @@ class ChatService {
     );
   }
 
+  Future<int?> getRevealIdentityPrice() async {
+    final response = await _apiClient.get(ApiConstants.revealIdentityPrice);
+    final data = response.data;
+    final rawPrice = data is Map<String, dynamic>
+        ? (data['price'] ?? data['amount'] ?? data['data'])
+        : data;
+
+    if (rawPrice == null) return null;
+    if (rawPrice is num) return rawPrice.toInt();
+    final parsed = int.tryParse(rawPrice.toString());
+    return parsed;
+  }
+
   Future<Conversation> startConversation(String username) async {
     final response = await _apiClient.post(
       ApiConstants.chatConversations,

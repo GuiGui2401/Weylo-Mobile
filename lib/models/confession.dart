@@ -19,6 +19,7 @@ class Confession {
   final bool isAnonymous;
   final int likesCount;
   final int viewsCount;
+  final int sharesCount;
   final int commentsCount;
   final bool isLiked;
   final bool isSponsored;
@@ -47,6 +48,7 @@ class Confession {
     this.isAnonymous = false,
     this.likesCount = 0,
     this.viewsCount = 0,
+    this.sharesCount = 0,
     this.commentsCount = 0,
     this.isLiked = false,
     this.isSponsored = false,
@@ -70,7 +72,7 @@ class Confession {
 
   /// Détermine si l'auteur doit être affiché
   /// L'auteur est visible si: post public ET non anonyme, OU identité révélée
-  bool get shouldShowAuthor => (isPublic && !isAnonymous) || isIdentityRevealed;
+  bool get shouldShowAuthor => isPublic && !isAnonymous;
 
   String get authorInitials {
     if (author != null) {
@@ -114,6 +116,7 @@ class Confession {
       isAnonymous: json['is_anonymous'] ?? json['isAnonymous'] ?? false,
       likesCount: json['likes_count'] ?? json['likesCount'] ?? 0,
       viewsCount: json['views_count'] ?? json['viewsCount'] ?? 0,
+      sharesCount: json['shares_count'] ?? json['sharesCount'] ?? 0,
       commentsCount: json['comments_count'] ?? json['commentsCount'] ?? 0,
       isLiked: json['is_liked'] ?? json['isLiked'] ?? false,
       isSponsored: json['is_sponsored'] ?? json['isSponsored'] ?? false,
@@ -166,6 +169,7 @@ class Confession {
       'is_anonymous': isAnonymous,
       'likes_count': likesCount,
       'views_count': viewsCount,
+      'shares_count': sharesCount,
       'comments_count': commentsCount,
       'is_liked': isLiked,
       'is_sponsored': isSponsored,
@@ -187,6 +191,7 @@ class Confession {
     String? promotionCtaLabel,
     String? promotionWebsiteUrl,
     int? commentsCount,
+    int? sharesCount,
     bool? isIdentityRevealed,
     String? imageUrl,
     String? videoUrl,
@@ -207,6 +212,7 @@ class Confession {
       isAnonymous: isAnonymous,
       likesCount: likesCount ?? this.likesCount,
       viewsCount: viewsCount,
+      sharesCount: sharesCount ?? this.sharesCount,
       commentsCount: commentsCount ?? this.commentsCount,
       isLiked: isLiked ?? this.isLiked,
       isSponsored: isSponsored ?? this.isSponsored,
@@ -234,6 +240,8 @@ class ConfessionComment {
   final String? mediaFullUrl;
   final String? mediaType;
   final User? user;
+  final int likesCount;
+  final bool isLiked;
   final DateTime createdAt;
 
   ConfessionComment({
@@ -247,6 +255,8 @@ class ConfessionComment {
     this.mediaFullUrl,
     this.mediaType,
     this.user,
+    this.likesCount = 0,
+    this.isLiked = false,
     required this.createdAt,
   });
 
@@ -283,9 +293,32 @@ class ConfessionComment {
       mediaFullUrl: json['media_full_url'] ?? json['mediaFullUrl'],
       mediaType: json['media_type'] ?? json['mediaType'],
       user: parseCommentUser(json['user'] ?? json['author']),
+      likesCount: json['likes_count'] ?? json['likesCount'] ?? 0,
+      isLiked: json['is_liked'] ?? json['isLiked'] ?? false,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
+    );
+  }
+
+  ConfessionComment copyWith({
+    int? likesCount,
+    bool? isLiked,
+  }) {
+    return ConfessionComment(
+      id: id,
+      confessionId: confessionId,
+      userId: userId,
+      parentId: parentId,
+      parent: parent,
+      content: content,
+      mediaUrl: mediaUrl,
+      mediaFullUrl: mediaFullUrl,
+      mediaType: mediaType,
+      user: user,
+      likesCount: likesCount ?? this.likesCount,
+      isLiked: isLiked ?? this.isLiked,
+      createdAt: createdAt,
     );
   }
 }

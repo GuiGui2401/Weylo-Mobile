@@ -53,8 +53,8 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => context.push('/wallet'),
           ),
           _buildSettingItem(
-            icon: Icons.lock_outline,
-            title: l10n.privacy,
+            icon: Icons.manage_accounts_outlined,
+            title: l10n.accountManagementHeader,
             onTap: () => context.push('/privacy'),
           ),
           _buildSettingItem(

@@ -66,5 +66,12 @@
 	<string>Weylo a besoin d'acceder a la camera pour prendre des photos et videos</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Weylo a besoin d'acceder a la galerie pour partager des photos</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Weylo a besoin d'acceder a vos contacts pour suggerer des profils.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+		<string>fetch</string>
+	</array>
 </dict>
 </plist>

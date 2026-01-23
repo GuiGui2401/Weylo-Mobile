@@ -15,6 +15,32 @@ class Helpers {
     return formatter.format(number);
   }
 
+  static double? parseAmount(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  static double? extractRequiredAmount(dynamic data) {
+    if (data is Map) {
+      final value =
+          data['required_amount'] ??
+          data['requiredAmount'] ??
+          data['amount'] ??
+          data['price'];
+      return parseAmount(value);
+    }
+    return null;
+  }
+
+  static String insufficientBalanceMessage({double? requiredAmount}) {
+    if (requiredAmount != null && requiredAmount > 0) {
+      return 'Solde insuffisant. Faites un depot de ${formatCurrency(requiredAmount)}.';
+    }
+    return 'Solde insuffisant. Faites un depot sur votre wallet.';
+  }
+
   // Get time ago string
   static String getTimeAgo(DateTime dateTime) {
     final locale = Intl.getCurrentLocale().startsWith('fr') ? 'fr' : 'en';

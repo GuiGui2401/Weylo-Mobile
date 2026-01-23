@@ -233,8 +233,10 @@ class _StoryReplyInputState extends State<StoryReplyInput> {
         maxLines: 3,
         minLines: 1,
         onChanged: (_) => setState(() {}),
+        style: const TextStyle(color: Colors.black87),
         decoration: InputDecoration(
           hintText: l10n.storyReplyHint,
+          hintStyle: const TextStyle(color: Colors.black54),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,

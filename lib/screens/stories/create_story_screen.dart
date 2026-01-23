@@ -1,9 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
+import '../../services/story_background_uploader.dart';
 import '../../services/story_service.dart';
+import '../../services/story_upload_queue.dart';
 
 class CreateStoryScreen extends StatefulWidget {
   const CreateStoryScreen({super.key});
@@ -15,15 +18,18 @@ class CreateStoryScreen extends StatefulWidget {
 class _CreateStoryScreenState extends State<CreateStoryScreen> {
   final TextEditingController _textController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
-  final StoryService _storyService = StoryService();
 
   File? _selectedMedia;
   bool _isVideo = false;
   bool _isUploading = false;
   Color _backgroundColor = AppColors.primary;
+  VideoPlayerController? _videoController;
+  Duration? _videoDuration;
+  final StoryService _storyService = StoryService();
 
   final List<Color> _backgroundColors = [
     AppColors.primary,
+    Colors.white,
     Colors.purple,
     Colors.pink,
     Colors.orange,
@@ -44,10 +50,12 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
   @override
   void dispose() {
     _textController.dispose();
+    _disposeVideoController();
     super.dispose();
   }
 
   Future<void> _pickImage() async {
+    _disposeVideoController();
     final XFile? image = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 1080,
@@ -64,6 +72,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
   }
 
   Future<void> _takePhoto() async {
+    _disposeVideoController();
     final XFile? image = await _imagePicker.pickImage(
       source: ImageSource.camera,
       maxWidth: 1080,
@@ -80,15 +89,22 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
   }
 
   Future<void> _pickVideo() async {
+    _disposeVideoController();
     final XFile? video = await _imagePicker.pickVideo(
       source: ImageSource.gallery,
-      maxDuration: const Duration(seconds: 60),
+      maxDuration: const Duration(seconds: 90),
     );
 
     if (video != null) {
+      final controller = VideoPlayerController.file(File(video.path));
+      await controller.initialize();
+      await controller.setLooping(true);
+      await controller.play();
       setState(() {
         _selectedMedia = File(video.path);
         _isVideo = true;
+        _videoController = controller;
+        _videoDuration = controller.value.duration;
       });
     }
   }
@@ -106,22 +122,52 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
       _isUploading = true;
     });
 
+    final type = _selectedMedia == null ? 'text' : (_isVideo ? 'video' : 'image');
+    final durationSeconds = _resolveStoryDurationSeconds();
+
     try {
-      await _storyService.createStory(
-        media: _selectedMedia,
+      if (_selectedMedia == null) {
+        await _storyService.createStory(
+          media: null,
+          text: _textController.text.trim(),
+          backgroundColor:
+              '#${_backgroundColor.value.toRadixString(16).substring(2)}',
+          type: 'text',
+          duration: durationSeconds,
+        );
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.storyPublishedSuccess),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        return;
+      }
+
+      final jobId = DateTime.now().millisecondsSinceEpoch.toString();
+      final job = StoryUploadJob(
+        id: jobId,
+        type: type,
+        mediaPath: _selectedMedia?.path,
         text: _textController.text.trim(),
         backgroundColor: _selectedMedia == null
             ? '#${_backgroundColor.value.toRadixString(16).substring(2)}'
             : null,
-        type: _selectedMedia == null ? 'text' : (_isVideo ? 'video' : 'image'),
+        durationSeconds: durationSeconds,
       );
 
+      await StoryUploadQueue().enqueue(job);
+      await StoryBackgroundUploader.enqueue(job);
+
       if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.storyPublishedSuccess),
-            backgroundColor: Colors.green,
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Publication en cours...'),
           ),
         );
       }
@@ -199,16 +245,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
           // Background/Preview
           if (_selectedMedia != null)
             _isVideo
-                ? Container(
-                    color: Colors.black,
-                    child: const Center(
-                      child: Icon(
-                        Icons.play_circle_outline,
-                        color: Colors.white,
-                        size: 80,
-                      ),
-                    ),
-                  )
+                ? _buildVideoPreview()
                 : Image.file(_selectedMedia!, fit: BoxFit.cover)
           else
             Container(
@@ -331,6 +368,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                           icon: Icons.text_fields,
                           label: l10n.textLabel,
                           onTap: () {
+                            _disposeVideoController();
                             setState(() {
                               _selectedMedia = null;
                             });
@@ -350,6 +388,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
               right: 16,
               child: GestureDetector(
                 onTap: () {
+                  _disposeVideoController();
                   setState(() {
                     _selectedMedia = null;
                   });
@@ -375,6 +414,49 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     final luminance = backgroundColor.computeLuminance();
     // Si le fond est clair, utiliser du texte foncé, sinon du texte clair
     return luminance > 0.5 ? Colors.black : Colors.white;
+  }
+
+  int _resolveStoryDurationSeconds() {
+    if (_isVideo) {
+      final seconds = _videoDuration?.inSeconds ?? 90;
+      if (seconds <= 0) return 90;
+      return seconds > 90 ? 90 : seconds;
+    }
+    return 5;
+  }
+
+  Widget _buildVideoPreview() {
+    final controller = _videoController;
+    if (controller == null || !controller.value.isInitialized) {
+      return Container(
+        color: Colors.black,
+        child: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: () {
+        if (controller.value.isPlaying) {
+          controller.pause();
+        } else {
+          controller.play();
+        }
+        setState(() {});
+      },
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: controller.value.aspectRatio,
+          child: VideoPlayer(controller),
+        ),
+      ),
+    );
+  }
+
+  void _disposeVideoController() {
+    _videoController?.dispose();
+    _videoController = null;
+    _videoDuration = null;
   }
 
   Widget _buildMediaButton({

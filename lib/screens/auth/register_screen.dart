@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/widgets/common/custom_text_field.dart';
 import '../../services/widgets/common/custom_button.dart';
 import '../../services/widgets/common/loading_overlay.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -22,6 +23,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     GlobalKey<FormState>(),
     GlobalKey<FormState>(),
     GlobalKey<FormState>(),
+    GlobalKey<FormState>(),
   ];
 
   final _pageController = PageController();
@@ -32,13 +34,12 @@ class _RegisterScreenState extends State<RegisterScreen>
   int _currentPage = 0;
 
   // Controllers
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  String _phoneFullNumber = '';
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -68,8 +69,6 @@ class _RegisterScreenState extends State<RegisterScreen>
   void dispose() {
     _pageController.dispose();
     _animationController.dispose();
-    _firstNameController.dispose();
-    _lastNameController.dispose();
     _usernameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -80,7 +79,7 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   void _nextPage() {
     if (_formKeys[_currentPage].currentState!.validate()) {
-      if (_currentPage < 2) {
+      if (_currentPage < 3) {
         _animationController.reverse().then((_) {
           _pageController.nextPage(
             duration: const Duration(milliseconds: 400),
@@ -111,7 +110,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
   Future<void> _handleRegister() async {
-    if (!_formKeys[2].currentState!.validate()) return;
+    if (!_formKeys[3].currentState!.validate()) return;
 
     if (!_acceptTerms) {
       Helpers.showErrorSnackBar(
@@ -123,17 +122,13 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.register(
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim().isEmpty
-          ? null
-          : _lastNameController.text.trim(),
+      // The user request did not mention first name and last name.
+      // I will use the username as a fallback for the first name.
+      firstName: _usernameController.text.trim(),
+      lastName: null,
       username: _usernameController.text.trim(),
-      email: _emailController.text.trim().isEmpty
-          ? null
-          : _emailController.text.trim(),
-      phone: _phoneController.text.trim().isEmpty
-          ? null
-          : _phoneController.text.trim(),
+      email: _emailController.text.trim(),
+      phone: _phoneFullNumber,
       password: _passwordController.text,
       passwordConfirmation: _confirmPasswordController.text,
     );
@@ -171,8 +166,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                       controller: _pageController,
                       physics: const NeverScrollableScrollPhysics(),
                       children: [
-                        _buildPersonalInfoPage(),
-                        _buildAccountInfoPage(),
+                        _buildUsernamePage(),
+                        _buildPhonePage(),
+                        _buildEmailPage(),
                         _buildSecurityPage(),
                       ],
                     ),
@@ -214,10 +210,12 @@ class _RegisterScreenState extends State<RegisterScreen>
     final l10n = AppLocalizations.of(context)!;
     switch (_currentPage) {
       case 0:
-        return l10n.registerPersonalInfoTitle;
+        return "Nom d'utilisateur";
       case 1:
-        return l10n.registerAccountInfoTitle;
+        return "Numéro de téléphone";
       case 2:
+        return "Adresse e-mail";
+      case 3:
         return l10n.registerSecurityTitle;
       default:
         return l10n.registerTitle;
@@ -230,12 +228,12 @@ class _RegisterScreenState extends State<RegisterScreen>
       child: Column(
         children: [
           Row(
-            children: List.generate(3, (index) {
+            children: List.generate(4, (index) {
               return Expanded(
                 child: Container(
                   margin: EdgeInsets.only(
                     left: index == 0 ? 0 : 4,
-                    right: index == 2 ? 0 : 4,
+                    right: index == 3 ? 0 : 4,
                   ),
                   height: 4,
                   decoration: BoxDecoration(
@@ -255,7 +253,7 @@ class _RegisterScreenState extends State<RegisterScreen>
           Text(
             AppLocalizations.of(
               context,
-            )!.registerStepLabel(_currentPage + 1, 3),
+            )!.registerStepLabel(_currentPage + 1, 4),
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
@@ -291,7 +289,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  Widget _buildPersonalInfoPage() {
+  Widget _buildUsernamePage() {
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(
@@ -318,7 +316,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 ),
 
                 Text(
-                  AppLocalizations.of(context)!.registerNameQuestion,
+                  "Choisissez votre nom d'utilisateur",
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -326,7 +324,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  AppLocalizations.of(context)!.registerNameSubtitle,
+                  "Votre nom d'utilisateur est unique.",
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -335,30 +333,21 @@ class _RegisterScreenState extends State<RegisterScreen>
                 const SizedBox(height: 32),
 
                 CustomTextField(
-                  controller: _firstNameController,
-                  label: AppLocalizations.of(context)!.firstNameLabelRequired,
-                  hintText: AppLocalizations.of(context)!.firstNameHint,
-                  prefixIcon: Icons.person_outline,
-                  textInputAction: TextInputAction.next,
+                  controller: _usernameController,
+                  label: AppLocalizations.of(context)!.usernameLabelRequired,
+                  hintText: AppLocalizations.of(context)!.usernameHint,
+                  prefixIcon: Icons.alternate_email,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _nextPage(),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return AppLocalizations.of(context)!.firstNameRequired;
+                      return AppLocalizations.of(context)!.usernameRequired;
                     }
-                    if (value.length < 2) {
-                      return AppLocalizations.of(context)!.firstNameTooShort;
+                    if (!Helpers.isValidUsername(value)) {
+                      return AppLocalizations.of(context)!.usernameInvalid;
                     }
                     return null;
                   },
-                ),
-                const SizedBox(height: 16),
-
-                CustomTextField(
-                  controller: _lastNameController,
-                  label: AppLocalizations.of(context)!.lastNameLabelOptional,
-                  hintText: AppLocalizations.of(context)!.lastNameHint,
-                  prefixIcon: Icons.person_outline,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _nextPage(),
                 ),
                 const SizedBox(height: 32),
 
@@ -375,7 +364,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  Widget _buildAccountInfoPage() {
+  Widget _buildPhonePage() {
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(
@@ -400,7 +389,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
-                        Icons.alternate_email,
+                        Icons.phone_iphone,
                         size: 50,
                         color: Colors.white,
                       ),
@@ -409,7 +398,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 ),
 
                 Text(
-                  AppLocalizations.of(context)!.registerIdentityTitle,
+                  "Votre numéro de téléphone",
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -417,7 +406,119 @@ class _RegisterScreenState extends State<RegisterScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  AppLocalizations.of(context)!.registerIdentitySubtitle,
+                  "Nous vous enverrons un code de vérification.",
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+
+                IntlPhoneField(
+                  controller: _phoneController,
+                  initialCountryCode: 'auto',
+                  disableLengthCheck: true,
+                  flagsButtonPadding: const EdgeInsets.only(left: 16),
+                  dropdownIconPosition: IconPosition.trailing,
+                  dropdownIcon: const Icon(Icons.arrow_drop_down),
+                  decoration: InputDecoration(
+                    hintText: "Numéro de Téléphone",
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    counterText: '',
+                  ),
+
+                  onChanged: (phone) {
+                    _phoneFullNumber = phone.completeNumber;
+                  },
+                  onSubmitted: (_) => _nextPage(),
+                  validator: (phone) {
+                    if (phone == null || phone.number.isEmpty) {
+                      return "Le numéro de téléphone est requis";
+                    }
+                    final digits = phone.completeNumber.replaceAll(
+                      RegExp(r'[\\s\\-\\+]'),
+                      '',
+                    );
+                    if (digits.length < 7 || digits.length > 15) {
+                      return AppLocalizations.of(context)!.phoneInvalid;
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 32),
+
+                CustomButton(
+                  text: AppLocalizations.of(context)!.continueAction,
+                  onPressed: _nextPage,
+                  suffixIcon: Icons.arrow_forward,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmailPage() {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKeys[2],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  height: 120,
+                  margin: const EdgeInsets.only(bottom: 32),
+                  child: Center(
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.email_outlined,
+                        size: 50,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+
+                Text(
+                  "Votre adresse e-mail",
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Utilisée pour la récupération de compte.",
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -426,54 +527,18 @@ class _RegisterScreenState extends State<RegisterScreen>
                 const SizedBox(height: 32),
 
                 CustomTextField(
-                  controller: _usernameController,
-                  label: AppLocalizations.of(context)!.usernameLabelRequired,
-                  hintText: AppLocalizations.of(context)!.usernameHint,
-                  prefixIcon: Icons.alternate_email,
-                  textInputAction: TextInputAction.next,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return AppLocalizations.of(context)!.usernameRequired;
-                    }
-                    if (!Helpers.isValidUsername(value)) {
-                      return AppLocalizations.of(context)!.usernameInvalid;
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                CustomTextField(
                   controller: _emailController,
-                  label: AppLocalizations.of(context)!.emailLabelOptional,
+                  label: "Adresse e-mail",
                   hintText: AppLocalizations.of(context)!.emailHint,
                   prefixIcon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   validator: (value) {
-                    if (value != null && value.isNotEmpty) {
-                      if (!Helpers.isValidEmail(value)) {
-                        return AppLocalizations.of(context)!.emailInvalid;
-                      }
+                    if (value == null || value.isEmpty) {
+                      return "L'adresse e-mail est requise";
                     }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                CustomTextField(
-                  controller: _phoneController,
-                  label: AppLocalizations.of(context)!.phoneLabelOptional,
-                  hintText: AppLocalizations.of(context)!.phoneHint,
-                  prefixIcon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _nextPage(),
-                  validator: (value) {
-                    if (value != null && value.isNotEmpty) {
-                      if (!Helpers.isValidPhone(value)) {
-                        return AppLocalizations.of(context)!.phoneInvalid;
-                      }
+                    if (!Helpers.isValidEmail(value)) {
+                      return AppLocalizations.of(context)!.emailInvalid;
                     }
                     return null;
                   },
@@ -503,11 +568,10 @@ class _RegisterScreenState extends State<RegisterScreen>
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Form(
-                key: _formKeys[2],
+                key: _formKeys[3],
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Illustration/Icon
                     Container(
                       height: 120,
                       margin: const EdgeInsets.only(bottom: 32),

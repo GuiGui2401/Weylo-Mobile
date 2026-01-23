@@ -151,10 +151,30 @@ class _ConfessionsScreenState extends State<ConfessionsScreen>
                 _buildConfessionsList(_sentConfessions, isSent: true),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'confessions_fab',
-        onPressed: () => context.push('/create-confession'),
-        child: const Icon(Icons.add),
+      floatingActionButton: Container(
+        width: 56,
+        height: 56,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          heroTag: 'confessions_fab',
+          onPressed: () => context.push('/create-confession'),
+          backgroundColor: Colors.grey.shade300,
+          elevation: 0,
+          shape: const CircleBorder(),
+          child: Icon(
+            Icons.add,
+            color: Colors.grey.shade700,
+          ),
+        ),
       ),
     );
   }

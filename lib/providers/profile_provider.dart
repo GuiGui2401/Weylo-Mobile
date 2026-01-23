@@ -47,22 +47,31 @@ class ProfileProvider extends ChangeNotifier {
     String username, {
     bool loadConfessions = true,
   }) async {
+    final isDifferentUser = _profileUser?.username != username;
+
+    if (isDifferentUser) {
+      _profileUser = null;
+      _userConfessions = [];
+      _confessionsPage = 1;
+      _hasMoreConfessions = true;
+    }
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _profileUser = await _userService.getUserByUsername(username);
+      final user = await _userService.getUserByUsername(username);
 
-      // Reset pagination
-      _confessionsPage = 1;
-      _hasMoreConfessions = true;
-      _userConfessions = [];
-
-      // Load user's confessions using username directly (not ID)
-      if (_profileUser != null && loadConfessions) {
-        await loadUserConfessionsByUsername(_profileUser!.username);
+      if (loadConfessions) {
+        // Reset pagination before loading confessions for the user
+        _confessionsPage = 1;
+        _hasMoreConfessions = true;
+        await loadUserConfessionsByUsername(username, loadMore: false);
       }
+      
+      _profileUser = user;
+
     } catch (e) {
       _error = e.toString();
       if (kDebugMode) print('Error loading profile: $e');

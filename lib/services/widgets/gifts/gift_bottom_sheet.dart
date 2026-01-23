@@ -427,8 +427,10 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
   }
 
   Widget _buildGiftMedia(Gift gift) {
+    final rawIcon = gift.icon;
+    final isEmojiIcon = _isEmojiIcon(rawIcon);
     final animationUrl = _resolveGiftUrl(gift.animation);
-    final iconUrl = _resolveGiftUrl(gift.icon);
+    final iconUrl = isEmojiIcon ? '' : _resolveGiftUrl(gift.icon);
 
     if (animationUrl.isNotEmpty) {
       final lower = animationUrl.toLowerCase();
@@ -453,6 +455,13 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
       );
     }
 
+    if (isEmojiIcon) {
+      return Text(
+        rawIcon,
+        style: const TextStyle(fontSize: 40),
+      );
+    }
+
     if (iconUrl.isNotEmpty) {
       return CachedNetworkImage(
         imageUrl: iconUrl,
@@ -468,6 +477,15 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
           AppColors.primaryGradient.createShader(bounds),
       child: const Icon(Icons.card_giftcard, size: 48, color: Colors.white),
     );
+  }
+
+  bool _isEmojiIcon(String value) {
+    if (value.isEmpty) return false;
+    final lower = value.toLowerCase();
+    if (lower.startsWith('http') || lower.contains('/') || lower.contains('.')) {
+      return false;
+    }
+    return true;
   }
 
   String _resolveGiftUrl(String? url) {

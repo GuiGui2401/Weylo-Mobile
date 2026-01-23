@@ -23,11 +23,13 @@ class _GroupsScreenState extends State<GroupsScreen>
   final RefreshController _discoverGroupsRefreshController =
       RefreshController();
   final TextEditingController _inviteCodeController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   List<Group> _myGroups = [];
   List<Group> _discoverGroups = [];
   bool _isLoading = true;
   bool _hasError = false;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -42,6 +44,7 @@ class _GroupsScreenState extends State<GroupsScreen>
     _myGroupsRefreshController.dispose();
     _discoverGroupsRefreshController.dispose();
     _inviteCodeController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -130,7 +133,10 @@ class _GroupsScreenState extends State<GroupsScreen>
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.groupsTitle),
+        title: Text(
+          l10n.groupsTitle,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.link),
@@ -150,25 +156,72 @@ class _GroupsScreenState extends State<GroupsScreen>
           ? const LoadingWidget()
           : _hasError
           ? ErrorState(onRetry: _loadData)
-          : TabBarView(
-              controller: _tabController,
+          : Column(
               children: [
-                _buildGroupsList(
-                  _myGroups,
-                  isMyGroups: true,
-                  controller: _myGroupsRefreshController,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Rechercher un groupe',
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value.trim();
+                      });
+                    },
+                  ),
                 ),
-                _buildGroupsList(
-                  _discoverGroups,
-                  isDiscover: true,
-                  controller: _discoverGroupsRefreshController,
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildGroupsList(
+                        _filteredGroups(_myGroups),
+                        isMyGroups: true,
+                        controller: _myGroupsRefreshController,
+                      ),
+                      _buildGroupsList(
+                        _filteredGroups(_discoverGroups),
+                        isDiscover: true,
+                        controller: _discoverGroupsRefreshController,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'groups_fab',
-        onPressed: () => context.push('/create-group'),
-        child: const Icon(Icons.add),
+      floatingActionButton: Container(
+        width: 56,
+        height: 56,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          heroTag: 'groups_fab',
+          onPressed: () => context.push('/create-group'),
+          backgroundColor: Colors.grey.shade300,
+          elevation: 0,
+          shape: const CircleBorder(),
+          child: Icon(
+            Icons.add,
+            color: Colors.grey.shade700,
+          ),
+        ),
       ),
     );
   }
@@ -216,6 +269,16 @@ class _GroupsScreenState extends State<GroupsScreen>
         },
       ),
     );
+  }
+
+  List<Group> _filteredGroups(List<Group> groups) {
+    if (_searchQuery.isEmpty) return groups;
+    final query = _searchQuery.toLowerCase();
+    return groups.where((group) {
+      final name = group.name.toLowerCase();
+      final description = (group.description ?? '').toLowerCase();
+      return name.contains(query) || description.contains(query);
+    }).toList();
   }
 
   void _showJoinGroupDialog(Group group) {
@@ -271,6 +334,7 @@ class _GroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final statusText = _buildGroupStatusText(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -352,6 +416,18 @@ class _GroupCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
+                    if (statusText != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        statusText,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -411,5 +487,41 @@ class _GroupCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String? _buildGroupStatusText(BuildContext context) {
+    final members = group.members ?? [];
+    final onlineCount =
+        members.where((m) => m.user?.isOnline == true).length;
+    final locale = Localizations.localeOf(context).languageCode;
+    final membersLabel = locale == 'fr'
+        ? '${group.membersCount} membres'
+        : '${group.membersCount} members';
+
+    if (onlineCount > 0) {
+      final onlineLabel =
+          locale == 'fr' ? '$onlineCount en ligne' : '$onlineCount online';
+      return '$onlineLabel • $membersLabel';
+    }
+
+    final lastActivity =
+        group.lastMessage?.createdAt ?? group.updatedAt ?? group.createdAt;
+    final now = DateTime.now();
+    final isToday =
+        now.year == lastActivity.year &&
+        now.month == lastActivity.month &&
+        now.day == lastActivity.day;
+    final timeText = Helpers.formatTime(lastActivity);
+
+    if (locale == 'fr') {
+      final base = isToday
+          ? "Derniere activite aujourd'hui a $timeText"
+          : 'Derniere activite le ${Helpers.formatDate(lastActivity)} a $timeText';
+      return '$base • $membersLabel';
+    }
+    final base = isToday
+        ? 'Last active today at $timeText'
+        : 'Last active on ${Helpers.formatDate(lastActivity)} at $timeText';
+    return '$base • $membersLabel';
   }
 }

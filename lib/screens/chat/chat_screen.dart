@@ -18,6 +18,7 @@ import '../../core/errors/exceptions.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/conversation.dart';
+import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/chat_service.dart';
 import '../../services/websocket_service.dart';
@@ -559,6 +560,14 @@ class _ChatScreenState extends State<ChatScreen> {
     final l10n = AppLocalizations.of(context)!;
     final currentUserId = context.read<AuthProvider>().user?.id ?? 0;
     final otherUser = _conversation?.getOtherParticipant(currentUserId);
+    final statusText = _buildOnlineStatusText(context, otherUser);
+    final flameCount = _conversation?.streakCount ?? 0;
+    final flameColor = Helpers.getFlameColor(
+      _conversation?.flameLevel.name ?? 'none',
+    );
+    final effectiveFlameColor = flameColor == Colors.transparent
+        ? AppColors.flameOrange
+        : flameColor;
 
     return Scaffold(
       appBar: AppBar(
@@ -582,6 +591,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         'https://i.pravatar.cc/150?img=${(_conversation?.id ?? 1) % 70 + 1}',
                     name: otherUser?.fullName,
                     size: 36,
+                    showOnlineIndicator: otherUser?.isOnline == true,
+                    isOnline: otherUser?.isOnline == true,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -594,26 +605,36 @@ class _ChatScreenState extends State<ChatScreen> {
                               child: Text(
                                 _conversation?.getDisplayName(currentUserId) ??
                                     l10n.userFallback,
-                                style: const TextStyle(fontSize: 16),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            if (_conversation?.getFlameEmoji().isNotEmpty ==
-                                true) ...[
-                              const SizedBox(width: 4),
+                            if (flameCount > 0) ...[
+                              const Text('🔥', style: TextStyle(fontSize: 14)),
                               Text(
-                                _conversation!.getFlameEmoji(),
-                                style: const TextStyle(fontSize: 12),
+                                '$flameCount',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: effectiveFlameColor,
+                                ),
                               ),
                             ],
                           ],
                         ),
-                        if (_conversation?.streakCount != null &&
-                            _conversation!.streakCount > 0)
+                        if (statusText != null) ...[
+                          const SizedBox(height: 2),
                           Text(
-                            l10n.streakDays(_conversation!.streakCount),
-                            style: Theme.of(context).textTheme.bodySmall,
+                            statusText,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
+                        ],
                       ],
                     ),
                   ),
@@ -696,6 +717,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       ),
                                     ),
                                     confirmDismiss: (_) async {
+                                      HapticFeedback.selectionClick();
                                       setState(() {
                                         _replyTo = message;
                                         _pendingReplyPreview = null;
@@ -721,6 +743,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       onOpenVideo: () =>
                                           _openVideoPlayer(mediaUrl),
                                       onReply: () {
+                                        HapticFeedback.selectionClick();
                                         setState(() {
                                           _replyTo = message;
                                           _pendingReplyPreview = null;
@@ -954,6 +977,38 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
     );
+  }
+
+  String? _buildOnlineStatusText(BuildContext context, User? user) {
+    if (user == null) return null;
+    if (user.isOnline) {
+      return Localizations.localeOf(context).languageCode == 'fr'
+          ? 'En ligne'
+          : 'Online';
+    }
+    final lastSeen = user.lastSeenAt;
+    if (lastSeen == null) return null;
+
+    final now = DateTime.now();
+    final isToday =
+        now.year == lastSeen.year &&
+        now.month == lastSeen.month &&
+        now.day == lastSeen.day;
+    final timeText = Helpers.formatTime(lastSeen);
+
+    if (Localizations.localeOf(context).languageCode == 'fr') {
+      if (isToday) {
+        return "En ligne aujourd'hui a $timeText";
+      }
+      final dateText = Helpers.formatDate(lastSeen);
+      return 'En ligne le $dateText a $timeText';
+    }
+
+    if (isToday) {
+      return 'Online today at $timeText';
+    }
+    final dateText = Helpers.formatDate(lastSeen);
+    return 'Online on $dateText at $timeText';
   }
 
   Widget _buildReplyPreview() {
@@ -1195,7 +1250,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (mounted) {
                   final message = Helpers.parseErrorMessage(e);
                   if (e is AppException && e.statusCode == 402) {
-                    Helpers.showSnackBar(context, message);
+                    final requiredAmount = Helpers.extractRequiredAmount(e.data);
+                    Helpers.showErrorSnackBar(
+                      context,
+                      Helpers.insufficientBalanceMessage(
+                        requiredAmount: requiredAmount,
+                      ),
+                    );
+                    context.push('/wallet');
                   } else {
                     Helpers.showErrorSnackBar(context, message);
                   }
@@ -1371,6 +1433,7 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDecoratedMedia = message.isGift || message.hasVoice;
     return GestureDetector(
       onLongPress: () => _showMessageOptions(context),
       child: Align(
@@ -1381,7 +1444,9 @@ class _MessageBubble extends StatelessWidget {
             maxWidth: MediaQuery.of(context).size.width * 0.82,
           ),
           decoration: BoxDecoration(
-            color: isMe ? AppColors.primary : AppColors.messageReceived,
+            color: isDecoratedMedia
+                ? Colors.transparent
+                : (isMe ? AppColors.primary : AppColors.messageReceived),
             borderRadius: BorderRadius.only(
               topLeft: const Radius.circular(16),
               topRight: const Radius.circular(16),
@@ -1390,7 +1455,9 @@ class _MessageBubble extends StatelessWidget {
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(5.0),
+            padding: isDecoratedMedia
+                ? const EdgeInsets.all(0)
+                : const EdgeInsets.all(5.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
@@ -1527,15 +1594,24 @@ class _MessageBubble extends StatelessWidget {
   Widget _buildAudioPlayer() {
     final isPlaying = playingMessageId == message.id;
     final barColor = isMe ? Colors.white : AppColors.primary;
-    const waveformBars = [6.0, 12.0, 8.0, 16.0, 10.0, 14.0, 8.0];
+    final bgColor = isMe ? Colors.white.withOpacity(0.12) : Colors.white;
+    final borderColor = barColor.withOpacity(isMe ? 0.35 : 0.22);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: GestureDetector(
         onTap: onPlayVoice,
         child: Container(
           decoration: BoxDecoration(
-            color: barColor.withOpacity(isMe ? 0.25 : 0.16),
-            borderRadius: BorderRadius.circular(30),
+            color: bgColor,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
@@ -1555,29 +1631,25 @@ class _MessageBubble extends StatelessWidget {
                   color: barColor,
                   size: 24,
                 ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: waveformBars.map((height) {
-                    return Container(
-                      width: 3,
-                      height: height,
-                      decoration: BoxDecoration(
-                        color: barColor,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    );
-                  }).toList(),
+                child: Container(
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: isMe ? Colors.white24 : Colors.black12,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Text(
                 statusLabel.isNotEmpty
                     ? statusLabel
                     : Helpers.formatTime(message.createdAt),
-                style: TextStyle(fontSize: 12, color: barColor.withOpacity(0.85)),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: barColor.withOpacity(0.9),
+                ),
               ),
             ],
           ),
@@ -1589,6 +1661,11 @@ class _MessageBubble extends StatelessWidget {
   Widget _buildGiftPreview(BuildContext context) {
     final gift = message.gift;
     final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/api/v1/?$'), '');
+    final rawIcon = gift?.icon ?? '';
+    final isEmojiIcon = _isEmojiIcon(rawIcon);
+    final shouldAnimateEmoji =
+        isEmojiIcon &&
+        DateTime.now().difference(message.createdAt).inSeconds <= 8;
 
     String resolveGiftUrl(String? url) {
       if (url == null || url.isEmpty) return '';
@@ -1613,7 +1690,7 @@ class _MessageBubble extends StatelessWidget {
     }
 
     final animationUrl = resolveGiftUrl(gift?.animation);
-    final iconUrl = resolveGiftUrl(gift?.icon);
+    final iconUrl = isEmojiIcon ? '' : resolveGiftUrl(gift?.icon);
 
     Widget media;
     if (animationUrl.isNotEmpty) {
@@ -1646,17 +1723,25 @@ class _MessageBubble extends StatelessWidget {
         fit: BoxFit.contain,
         errorWidget: (context, url, error) => const Icon(Icons.card_giftcard, size: 48),
       );
+    } else if (isEmojiIcon) {
+      media = _buildGiftEmoji(rawIcon, animate: shouldAnimateEmoji);
     } else {
       media = const Icon(Icons.card_giftcard, size: 48);
     }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isMe ? AppColors.primary.withOpacity(0.12) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider.withOpacity(0.6)),
+        color: isMe ? AppColors.primary.withOpacity(0.1) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1689,6 +1774,33 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
+  bool _isEmojiIcon(String value) {
+    if (value.isEmpty) return false;
+    final lower = value.toLowerCase();
+    if (lower.startsWith('http') || lower.contains('/') || lower.contains('.')) {
+      return false;
+    }
+    return true;
+  }
+
+  Widget _buildGiftEmoji(String emoji, {required bool animate}) {
+    final text = Text(
+      emoji,
+      style: const TextStyle(fontSize: 56),
+    );
+    if (!animate) return text;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.7, end: 1.0),
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutBack,
+      builder: (context, scale, child) => Transform.scale(
+        scale: scale,
+        child: child,
+      ),
+      child: text,
+    );
+  }
+
   Widget _buildStatusIcon() {
     return Icon(
       message.isRead ? Icons.done_all : Icons.done,
@@ -1712,6 +1824,18 @@ class _MessageBubble extends StatelessWidget {
                 title: Text(l10n.replyAction),
                 onTap: () { Navigator.pop(ctx); onReply?.call(); },
               ),
+              if (onDelete != null)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Colors.red),
+                  title: Text(
+                    l10n.deleteAction,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    onDelete?.call();
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.copy),
                 title: Text(l10n.copyAction),

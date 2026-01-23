@@ -8,6 +8,7 @@ import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/conversation.dart';
+import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/chat_service.dart';
 import '../../services/websocket_service.dart';
@@ -171,7 +172,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.conversationsTitle),
+        title: Text(
+          l10n.conversationsTitle,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -215,14 +219,15 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         ],
       ),
       floatingActionButton: Container(
-        decoration: BoxDecoration(
-          gradient: AppColors.primaryGradient,
+        width: 56,
+        height: 56,
+        decoration: const BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.4),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: Colors.black26,
+              blurRadius: 10,
+              offset: Offset(0, 4),
             ),
           ],
         ),
@@ -232,9 +237,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             context.push('/new-chat');
           },
           tooltip: l10n.newConversationFab,
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.grey.shade300,
           elevation: 0,
-          child: const Icon(Icons.chat, color: Colors.white),
+          shape: const CircleBorder(),
+          child: Icon(
+            Icons.chat,
+            color: Colors.grey.shade700,
+          ),
         ),
       ),
     );
@@ -392,6 +401,8 @@ class _ConversationTile extends StatelessWidget {
             imageUrl: otherUser?.avatar,
             name: otherUser?.fullName,
             size: 52,
+            showOnlineIndicator: otherUser?.isOnline == true,
+            isOnline: otherUser?.isOnline == true,
           ),
           if (!conversation.isIdentityRevealed)
             Positioned(
@@ -415,26 +426,43 @@ class _ConversationTile extends StatelessWidget {
       title: Row(
         children: [
           Expanded(
-            child: Text(
-              conversation.isIdentityRevealed
-                  ? otherUser?.fullName ??
-                      AppLocalizations.of(context)!.userFallback
-                  : AppLocalizations.of(context)!.anonymousConversation,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: conversation.unreadCount > 0
-                    ? FontWeight.bold
-                    : FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        conversation.isIdentityRevealed
+                            ? otherUser?.fullName ??
+                                AppLocalizations.of(context)!.userFallback
+                            : AppLocalizations.of(context)!
+                                .anonymousConversation,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: conversation.unreadCount > 0
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (streakCount > 0) ...[
+                      _FlameBadge(
+                        count: streakCount,
+                        flameLevel: conversation.flameLevel.name,
+                      ),
+                    ],
+                    if (showHourglass) ...[
+                      const SizedBox(width: 4),
+                      const _PulsingHourglassIcon(),
+                    ],
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 6),
-          _FlameBadge(count: streakCount),
-          if (showHourglass) ...[
-            const SizedBox(width: 4),
-            const _PulsingHourglassIcon(),
-          ],
         ],
       ),
       subtitle: _buildSubtitle(context),
@@ -479,6 +507,39 @@ class _ConversationTile extends StatelessWidget {
     final expiryTime = referenceTime.add(const Duration(hours: 24));
     final remaining = expiryTime.difference(DateTime.now());
     return remaining > Duration.zero && remaining <= const Duration(hours: 3);
+  }
+
+  String? _buildStatusText(BuildContext context, User? user) {
+    if (user == null) return null;
+    final isOnline = user.isOnline;
+    if (isOnline) {
+      return Localizations.localeOf(context).languageCode == 'fr'
+          ? 'En ligne'
+          : 'Online';
+    }
+    final lastSeen = user.lastSeenAt;
+    if (lastSeen == null) return null;
+
+    final now = DateTime.now();
+    final isToday =
+        now.year == lastSeen.year &&
+        now.month == lastSeen.month &&
+        now.day == lastSeen.day;
+    final timeText = Helpers.formatTime(lastSeen);
+
+    if (Localizations.localeOf(context).languageCode == 'fr') {
+      if (isToday) {
+        return "En ligne aujourd'hui a $timeText";
+      }
+      final dateText = Helpers.formatDate(lastSeen);
+      return 'En ligne le $dateText a $timeText';
+    }
+
+    if (isToday) {
+      return 'Online today at $timeText';
+    }
+    final dateText = Helpers.formatDate(lastSeen);
+    return 'Online on $dateText at $timeText';
   }
 }
 
@@ -568,9 +629,10 @@ class _StreakStatusIndicator extends StatelessWidget {
 }
 
 class _FlameBadge extends StatefulWidget {
-  const _FlameBadge({required this.count});
+  const _FlameBadge({required this.count, required this.flameLevel});
 
   final int count;
+  final String flameLevel;
 
   @override
   State<_FlameBadge> createState() => _FlameBadgeState();
@@ -580,6 +642,7 @@ class _FlameBadgeState extends State<_FlameBadge>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scaleAnimation;
+  bool _pulseUp = false;
 
   @override
   void initState() {
@@ -627,32 +690,41 @@ class _FlameBadgeState extends State<_FlameBadge>
   @override
   Widget build(BuildContext context) {
     final displayCount = widget.count < 0 ? 0 : widget.count;
-    return AnimatedBuilder(
-      animation: _scaleAnimation,
-      builder: (context, child) => Transform.scale(
-        scale: _scaleAnimation.value,
-        child: child,
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          const Icon(
-            Icons.local_fire_department_rounded,
-            size: 18,
-            color: Color(0xFFFF8A00),
-          ),
-          Positioned(
-            top: 6,
-            child: Text(
+    final flameColor = Helpers.getFlameColor(widget.flameLevel);
+    final effectiveColor =
+        flameColor == Colors.transparent ? AppColors.flameOrange : flameColor;
+
+    return AnimatedScale(
+      scale: widget.count > 0 ? (_pulseUp ? 1.06 : 1.0) : 1.0,
+      duration: const Duration(milliseconds: 900),
+      onEnd: widget.count > 0
+          ? () {
+              if (!mounted) return;
+              setState(() {
+                _pulseUp = !_pulseUp;
+              });
+            }
+          : null,
+      child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnimation.value,
+          child: child,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🔥', style: TextStyle(fontSize: 16)),
+            Text(
               '$displayCount',
-              style: const TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: effectiveColor,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

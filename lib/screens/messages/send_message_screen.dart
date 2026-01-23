@@ -1,15 +1,16 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/constants/app_constants.dart';
+import '../../core/errors/exceptions.dart';
+import '../../core/utils/helpers.dart';
 import '../../models/user.dart';
 import '../../models/conversation.dart';
 import '../../services/message_service.dart';
 import '../../services/user_service.dart';
 import '../../services/chat_service.dart';
-import '../../services/storage_service.dart';
 import '../../services/widgets/common/widgets.dart';
 import '../../services/widgets/voice/voice_recorder_widget.dart';
 import '../../services/voice_effects_service.dart';
@@ -23,16 +24,16 @@ class SendMessageScreen extends StatefulWidget {
   State<SendMessageScreen> createState() => _SendMessageScreenState();
 }
 
-class _SendMessageScreenState extends State<SendMessageScreen> {
+class _SendMessageScreenState extends State<SendMessageScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _messageController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   final MessageService _messageService = MessageService();
   final ImagePicker _imagePicker = ImagePicker();
   final UserService _userService = UserService();
   final ChatService _chatService = ChatService(debugLogs: true);
-  final StorageService _storage = StorageService();
 
-  bool _isAnonymous = true;
+  bool _isAnonymous = false;
   bool _isSending = false;
   bool _showVoiceRecorder = false;
   File? _selectedImage;
@@ -45,6 +46,10 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
   List<User> _defaultUsers = [];
   bool _isLoadingUsers = true;
   String _searchQuery = '';
+  bool _isLoadingRevealPrice = false;
+  int? _revealIdentityPrice;
+  final Set<String> _revealingUsers = {};
+  late final AnimationController _shimmerController;
 
   Map<String, ConversationIndex> _conversationIndex = {};
   bool _isLoadingConversations = true;
@@ -55,25 +60,19 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
     if (widget.recipientUsername.isNotEmpty) {
       _selectedRecipient = widget.recipientUsername;
     }
-    _loadAnonymousPreference();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
     _loadUsers();
     _loadConversations();
-  }
-
-  Future<void> _loadAnonymousPreference() async {
-    final saved = await _storage.getBool(AppConstants.anonymousModeKey);
-    if (!mounted) return;
-    if (saved != null) {
-      setState(() {
-        _isAnonymous = saved;
-      });
-    }
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _searchController.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 
@@ -138,6 +137,74 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
     }
   }
 
+  Future<int?> _ensureRevealIdentityPrice() async {
+    if (_revealIdentityPrice != null) return _revealIdentityPrice;
+    if (_isLoadingRevealPrice) return _revealIdentityPrice;
+    setState(() {
+      _isLoadingRevealPrice = true;
+    });
+
+    try {
+      final price = await _chatService.getRevealIdentityPrice();
+      if (!mounted) return _revealIdentityPrice;
+      setState(() {
+        _revealIdentityPrice = price;
+      });
+      return price;
+    } catch (_) {
+      return _revealIdentityPrice;
+    } finally {
+      if (!mounted) return _revealIdentityPrice;
+      setState(() {
+        _isLoadingRevealPrice = false;
+      });
+    }
+  }
+
+  Widget _buildRevealIdentityPromptSkeleton() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildShimmerBar(width: double.infinity, height: 12),
+        const SizedBox(height: 8),
+        _buildShimmerBar(width: 180, height: 12),
+      ],
+    );
+  }
+
+  Widget _buildShimmerBar({required double width, required double height}) {
+    return AnimatedBuilder(
+      animation: _shimmerController,
+      builder: (context, child) {
+        final progress = _shimmerController.value;
+        return ShaderMask(
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              begin: Alignment(-1.0 + progress * 2.0, 0),
+              end: Alignment(1.0 + progress * 2.0, 0),
+              colors: [
+                Colors.grey.shade300,
+                Colors.grey.shade100,
+                Colors.grey.shade300,
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ).createShader(bounds);
+          },
+          blendMode: BlendMode.srcATop,
+          child: Container(
+            width: width,
+            height: height,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _searchUsers(String query) async {
     if (query.isEmpty) {
       setState(() {
@@ -163,6 +230,111 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
       debugPrint('Error searching users: $e');
       if (!mounted) return;
       setState(() => _isSearching = false);
+    }
+  }
+
+  Future<void> _promptRevealIdentity(User user) async {
+    final l10n = AppLocalizations.of(context)!;
+    final index = _conversationIndex[user.username];
+    final conversationId = index?.sampleConversation?.id;
+
+    if (conversationId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        SnackBar(content: Text(l10n.errorOccurredTitle)),
+      );
+      return;
+    }
+
+    final priceFuture = _ensureRevealIdentityPrice();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return FutureBuilder<int?>(
+          future: priceFuture,
+          builder: (context, snapshot) {
+            final isLoading = snapshot.connectionState == ConnectionState.waiting;
+            final amountLabel = snapshot.data != null
+                ? '${snapshot.data} FCFA'
+                : '...';
+            return AlertDialog(
+              title: Text(l10n.revealIdentityTitle),
+              content: isLoading
+                  ? _buildRevealIdentityPromptSkeleton()
+                  : Text(l10n.revealIdentityPrompt(amountLabel)),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text(
+                    MaterialLocalizations.of(context).cancelButtonLabel,
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isLoading ? null : () => Navigator.pop(context, true),
+                  child: Text(l10n.revealIdentityAction),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      setState(() {
+        _revealingUsers.add(user.username);
+      });
+      final conversation = await _chatService.revealIdentity(conversationId);
+      if (!mounted) return;
+      setState(() {
+        _conversationIndex[user.username] =
+            (_conversationIndex[user.username] ??
+                    ConversationIndex(
+                      username: user.username,
+                      hasConversation: true,
+                      isIdentityRevealed: true,
+                      sampleConversation: conversation,
+                    ))
+                .copyWith(
+                  isIdentityRevealed: true,
+                  sampleConversation: conversation,
+                );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.revealIdentitySuccessWithName(
+              conversation.otherParticipant?.fullName ?? user.fullName,
+            ),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      if (e is AppException && e.statusCode == 402) {
+        final requiredAmount = Helpers.extractRequiredAmount(e.data);
+        Helpers.showErrorSnackBar(
+          context,
+          Helpers.insufficientBalanceMessage(requiredAmount: requiredAmount),
+        );
+        context.push('/wallet');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.errorMessage(e.toString())),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _revealingUsers.remove(user.username);
+      });
     }
   }
 
@@ -222,6 +394,7 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
     final index = _conversationIndex[user.username];
     final hasConversation = index?.hasConversation ?? false;
     final isIdentityRevealed = index?.isIdentityRevealed ?? false;
+    final isRevealing = _revealingUsers.contains(user.username);
 
     final shouldHideInfo = !hasConversation || !isIdentityRevealed;
 
@@ -297,6 +470,18 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
           ),
         ],
       ),
+      trailing: hasConversation && !isIdentityRevealed
+          ? TextButton(
+              onPressed: isRevealing ? null : () => _promptRevealIdentity(user),
+              child: isRevealing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n.revealIdentityAction),
+            )
+          : null,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       onTap: () {
         setState(() {
@@ -545,61 +730,6 @@ class _SendMessageScreenState extends State<SendMessageScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _isAnonymous
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                          color: _isAnonymous ? AppColors.primary : Colors.grey,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _isAnonymous
-                                    ? l10n.anonymousMode
-                                    : l10n.publicMode,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                _isAnonymous
-                                    ? l10n.anonymousModeSubtitle
-                                    : l10n.publicModeSubtitle,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Switch(
-                          value: _isAnonymous,
-                          onChanged: (value) {
-                            setState(() {
-                              _isAnonymous = value;
-                            });
-                            _storage.setBool(AppConstants.anonymousModeKey, value);
-                          },
-                          activeColor: AppColors.primary,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
                   TextField(
                     controller: _messageController,
                     maxLines: 8,

@@ -16,6 +16,8 @@ import '../../services/widgets/confessions/confession_card.dart';
 import '../../services/widgets/common/empty_state.dart';
 import '../../services/widgets/promotions/promote_post_modal.dart';
 import '../../services/confession_service.dart';
+import '../../services/confession_background_uploader.dart';
+import '../../services/confession_upload_queue.dart';
 import '../stories/create_story_screen.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -28,6 +30,7 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   final RefreshController _refreshController = RefreshController();
   final ChatService _chatService = ChatService();
+  final ConfessionService _confessionService = ConfessionService();
   int _maxStreakCount = 0;
 
   @override
@@ -150,6 +153,15 @@ class _FeedScreenState extends State<FeedScreen> {
               slivers: [
                 // Stories bar
                 const SliverToBoxAdapter(child: StoriesBar()),
+                SliverToBoxAdapter(
+                  child: _ContactRecommendationsSection(
+                    onRequestContacts: () {
+                      context
+                          .read<FeedProvider>()
+                          .loadContactRecommendations(requestPermission: true);
+                    },
+                  ),
+                ),
 
                 // Confessions feed
                 if (feedProvider.confessions.isEmpty)
@@ -205,23 +217,28 @@ class _FeedScreenState extends State<FeedScreen> {
         },
       ),
       floatingActionButton: Container(
-        decoration: BoxDecoration(
-          gradient: AppColors.primaryGradient,
+        width: 56,
+        height: 56,
+        decoration: const BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.4),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: Colors.black26,
+              blurRadius: 10,
+              offset: Offset(0, 4),
             ),
           ],
         ),
         child: FloatingActionButton(
           heroTag: 'feed_fab',
           onPressed: () => _showCreatePostSheet(),
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.grey.shade300,
           elevation: 0,
-          child: const Icon(Icons.edit, color: Colors.white),
+          shape: const CircleBorder(),
+          child: Icon(
+            Icons.edit,
+            color: Colors.grey.shade700,
+          ),
         ),
       ),
     );
@@ -244,13 +261,16 @@ class _FeedScreenState extends State<FeedScreen> {
     context.push('/post/$confessionId');
   }
 
-  void _shareConfession(int confessionId) {
+  Future<void> _shareConfession(int confessionId) async {
     final l10n = AppLocalizations.of(context)!;
     final shareUrl = DeepLinkService.getPostShareLink(confessionId);
-    Share.share(
+    await Share.share(
       l10n.sharePostMessage(shareUrl),
       subject: l10n.sharePostSubject,
     );
+    try {
+      await _confessionService.shareConfession(confessionId);
+    } catch (_) {}
   }
 
   void _showPromoteSheet(int confessionId) {
@@ -272,26 +292,142 @@ class _FlameBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayCount = count < 0 ? 0 : count;
-    return Stack(
-      alignment: Alignment.center,
+    final flameColor = AppColors.flameOrange;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(
-          Icons.local_fire_department_rounded,
-          size: 20,
-          color: Color(0xFFFF8A00),
-        ),
-        Positioned(
-          top: 7,
-          child: Text(
-            '$displayCount',
-            style: const TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+        const Text('🔥', style: TextStyle(fontSize: 18)),
+        const SizedBox(width: 4),
+        Text(
+          '$displayCount',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: flameColor,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ContactRecommendationsSection extends StatelessWidget {
+  final VoidCallback onRequestContacts;
+
+  const _ContactRecommendationsSection({
+    required this.onRequestContacts,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<FeedProvider>(
+      builder: (context, feedProvider, child) {
+        final recommendations = feedProvider.contactRecommendations;
+        final isLoading = feedProvider.isLoadingRecommendations;
+        final permissionDenied = feedProvider.contactsPermissionDenied;
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Suggestions de profils',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Basees sur vos contacts',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+              ),
+              const SizedBox(height: 12),
+              if (recommendations.isEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ElevatedButton.icon(
+                    onPressed: isLoading ? null : onRequestContacts,
+                    icon: const Icon(Icons.contacts),
+                    label: Text(
+                      permissionDenied
+                          ? 'Autoriser les contacts'
+                          : 'Trouver des amis',
+                    ),
+                  ),
+                )
+              else if (isLoading)
+                const SizedBox(
+                  height: 48,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else
+                SizedBox(
+                  height: 72,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: recommendations.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      final user = recommendations[index];
+                      return GestureDetector(
+                        onTap: () {
+                          if (user.username.isNotEmpty) {
+                            context.push('/u/${user.username}');
+                          }
+                        },
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 24,
+                              backgroundColor: Colors.grey[200],
+                              backgroundImage: user.avatar != null
+                                  ? NetworkImage(user.avatar!)
+                                  : null,
+                              child: user.avatar == null
+                                  ? Text(
+                                      user.initials,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: 64,
+                              child: Text(
+                                user.firstName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -395,13 +531,33 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
 
     setState(() => _isLoading = true);
 
+    final hasMedia = _selectedImage != null || _selectedVideo != null;
+    if (hasMedia) {
+      final job = ConfessionUploadJob(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: 'public',
+        isAnonymous: !_isPublic,
+        content: content.isNotEmpty ? content : null,
+        imagePath: _selectedImage?.path,
+        videoPath: _selectedVideo?.path,
+      );
+      await ConfessionUploadQueue().enqueue(job);
+      await ConfessionBackgroundUploader.enqueue(job);
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onPostCreated?.call();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.statusSending)),
+        );
+      }
+      return;
+    }
+
     try {
       await _confessionService.createConfession(
         content: content.isNotEmpty ? content : '',
         type: 'public',
         isAnonymous: !_isPublic,
-        image: _selectedImage,
-        video: _selectedVideo,
       );
 
       if (mounted) {
