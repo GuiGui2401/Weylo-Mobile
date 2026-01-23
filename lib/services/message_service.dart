@@ -124,7 +124,30 @@ class MessageService {
       '${ApiConstants.messages}/send/$recipientUsername',
       data: formData,
     );
-    return AnonymousMessage.fromJson(response.data['message'] ?? response.data);
+
+    final responseData = response.data;
+    Map<String, dynamic>? payload;
+
+    if (responseData is Map<String, dynamic>) {
+      final dataField = responseData['message'] ??
+          responseData['data'] ??
+          responseData;
+      if (dataField is Map<String, dynamic>) {
+        payload = dataField;
+      }
+    }
+
+    if (payload != null) {
+      return AnonymousMessage.fromJson(payload);
+    }
+
+    return AnonymousMessage(
+      id: 0,
+      senderId: 0,
+      recipientId: 0,
+      content: responseData?.toString() ?? '',
+      createdAt: DateTime.now(),
+    );
   }
 
   Future<AnonymousMessage> revealIdentity(int messageId) async {

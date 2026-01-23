@@ -2647,18 +2647,20 @@ class _StoryViewerScreenState extends State<_StoryViewerScreen> {
       }
 
       _stories = stories;
-      _storyUser = stories.first.user;
+      User? storyUser = stories.first.user;
+      final needsUserFetch = storyUser == null ||
+          storyUser.username.trim().isEmpty;
 
-      // If user is not included in story, load it separately
-      if (_storyUser == null && stories.first.userId > 0) {
+      if (needsUserFetch && stories.first.userId > 0) {
         try {
           final userService = UserService();
-          _storyUser = await userService.getUserById(stories.first.userId);
+          storyUser = await userService.getUserById(stories.first.userId);
         } catch (e) {
-          // User could not be loaded, but continue with stories
-          print('Could not load user: $e');
+          debugPrint('Could not load user details: $e');
         }
       }
+
+      _storyUser = storyUser;
 
       if (_storyUser == null) {
         setState(() {
