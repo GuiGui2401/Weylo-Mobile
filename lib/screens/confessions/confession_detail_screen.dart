@@ -49,6 +49,8 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
   String? _error;
   final Set<int> _commentLikeLoading = {};
   final Set<int> _commentLikeAnimating = {};
+  bool _hasManualLikeState = false;
+  bool? _manualLikeState;
 
   @override
   void initState() {
@@ -158,6 +160,11 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
       return confession;
     }
     return confession.copyWith(isLiked: _manualLikeState);
+  }
+
+  String _resolveMediaUrl(String? url) {
+    final resolved = resolveMediaUrl(url);
+    return resolved.isEmpty ? '' : resolved;
   }
 
   Future<void> _sendComment() async {
@@ -911,28 +918,7 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
                               ],
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (comment.content.isNotEmpty)
-                  Text(
-                    comment.content,
-                    style: const TextStyle(fontSize: 14, height: 1.4),
-                  ),
-                if (resolvedMediaUrl.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: CachedNetworkImage(
-                      imageUrl: resolvedMediaUrl,
-                      width: double.infinity,
-                      height: 200,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        height: 200,
-                        color: Colors.grey[200],
-                        child: const Center(child: CircularProgressIndicator()),
+                        ],
                       ),
                     ),
                   if (comment.content.isNotEmpty)
@@ -940,14 +926,12 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
                       comment.content,
                       style: const TextStyle(fontSize: 14, height: 1.4),
                     ),
-                  if (comment.mediaFullUrl != null ||
-                      comment.mediaUrl != null) ...[
+                  if (resolvedMediaUrl.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: CachedNetworkImage(
-                        imageUrl:
-                            comment.mediaFullUrl ?? comment.mediaUrl ?? '',
+                        imageUrl: resolvedMediaUrl,
                         width: double.infinity,
                         height: 200,
                         fit: BoxFit.cover,
@@ -970,76 +954,76 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
                         ),
                       ),
                     ),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => _toggleCommentLike(comment),
-                      child: Row(
-                        children: [
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Icon(
-                                comment.isLiked
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                size: 18,
-                                color: comment.isLiked
-                                    ? Colors.redAccent
-                                    : Colors.grey[600],
-                              ),
-                              if (_commentLikeAnimating.contains(comment.id))
-                                TweenAnimationBuilder<double>(
-                                  tween: Tween(begin: 0.6, end: 1.2),
-                                  duration: const Duration(milliseconds: 260),
-                                  curve: Curves.easeOutBack,
-                                  builder: (context, scale, child) =>
-                                      Transform.scale(
-                                    scale: scale,
-                                    child: child,
-                                  ),
-                                  child: const Icon(
-                                    Icons.favorite,
-                                    size: 18,
-                                    color: Colors.redAccent,
-                                  ),
+                  ],
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => _toggleCommentLike(comment),
+                        child: Row(
+                          children: [
+                            Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Icon(
+                                  comment.isLiked
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  size: 18,
+                                  color: comment.isLiked
+                                      ? Colors.redAccent
+                                      : Colors.grey[600],
                                 ),
-                            ],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${comment.likesCount}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w600,
+                                if (_commentLikeAnimating.contains(comment.id))
+                                  TweenAnimationBuilder<double>(
+                                    tween: Tween(begin: 0.6, end: 1.2),
+                                    duration: const Duration(milliseconds: 260),
+                                    curve: Curves.easeOutBack,
+                                    builder: (context, scale, child) =>
+                                        Transform.scale(
+                                      scale: scale,
+                                      child: child,
+                                    ),
+                                    child: const Icon(
+                                      Icons.favorite,
+                                      size: 18,
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _replyToComment = comment;
-                        });
-                      },
-                      child: Text(
-                        l10n.replyAction,
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                            const SizedBox(width: 4),
+                            Text(
+                              '${comment.likesCount}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 16),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _replyToComment = comment;
+                          });
+                        },
+                        child: Text(
+                          l10n.replyAction,
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),

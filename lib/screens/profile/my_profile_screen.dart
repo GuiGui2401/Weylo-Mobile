@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:lottie/lottie.dart';
+import 'package:weylo_mobile/core/utils/media_utils.dart';
 import '../../l10n/app_localizations.dart';
 import 'dart:typed_data';
 import 'package:video_thumbnail/video_thumbnail.dart';
