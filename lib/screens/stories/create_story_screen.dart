@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/helpers.dart';
 import '../../services/story_background_uploader.dart';
 import '../../services/story_service.dart';
 import '../../services/story_upload_queue.dart';
@@ -54,6 +56,14 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     super.dispose();
   }
 
+  Future<File> _saveFilePermanently(XFile file) async {
+    final Directory appDir = await getApplicationDocumentsDirectory();
+    final String fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+    final String savedPath = '${appDir.path}/$fileName';
+    final File savedFile = await File(file.path).copy(savedPath);
+    return savedFile;
+  }
+
   Future<void> _pickImage() async {
     _disposeVideoController();
     final XFile? image = await _imagePicker.pickImage(
@@ -64,8 +74,9 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     );
 
     if (image != null) {
+      final savedFile = await _saveFilePermanently(image);
       setState(() {
-        _selectedMedia = File(image.path);
+        _selectedMedia = savedFile;
         _isVideo = false;
       });
     }
@@ -81,8 +92,9 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     );
 
     if (image != null) {
+      final savedFile = await _saveFilePermanently(image);
       setState(() {
-        _selectedMedia = File(image.path);
+        _selectedMedia = savedFile;
         _isVideo = false;
       });
     }
@@ -92,19 +104,41 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     _disposeVideoController();
     final XFile? video = await _imagePicker.pickVideo(
       source: ImageSource.gallery,
-      maxDuration: const Duration(seconds: 90),
+      maxDuration: const Duration(seconds: 60),
     );
 
     if (video != null) {
-      final controller = VideoPlayerController.file(File(video.path));
-      await controller.initialize();
-      await controller.setLooping(true);
-      await controller.play();
+      final savedFile = await _saveFilePermanently(video);
+      VideoPlayerController? controller;
+      try {
+        controller = VideoPlayerController.file(savedFile);
+        await controller.initialize();
+        await controller.setLooping(true);
+        await controller.play();
+        controller.addListener(() {
+          if (!mounted) return;
+          if (controller != null && controller.value.hasError) {
+            Helpers.showSnackBar(
+              context,
+              'Lecture video non supportee, publication quand meme possible.',
+            );
+          }
+        });
+      } catch (_) {
+        await controller?.dispose();
+        controller = null;
+        if (mounted) {
+          Helpers.showSnackBar(
+            context,
+            'Apercu video indisponible, la publication sera envoyee.',
+          );
+        }
+      }
       setState(() {
-        _selectedMedia = File(video.path);
+        _selectedMedia = savedFile;
         _isVideo = true;
         _videoController = controller;
-        _videoDuration = controller.value.duration;
+        _videoDuration = controller?.value.duration;
       });
     }
   }
@@ -112,9 +146,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
   Future<void> _publishStory() async {
     final l10n = AppLocalizations.of(context)!;
     if (_selectedMedia == null && _textController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.storyContentRequired)));
+      Helpers.showErrorSnackBar(context, l10n.storyContentRequired);
       return;
     }
 
@@ -123,55 +155,50 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     });
 
     final type = _selectedMedia == null ? 'text' : (_isVideo ? 'video' : 'image');
-    final durationSeconds = _resolveStoryDurationSeconds();
-
-    try {
-      if (_selectedMedia == null) {
-        await _storyService.createStory(
-          media: null,
-          text: _textController.text.trim(),
-          backgroundColor:
-              '#${_backgroundColor.value.toRadixString(16).substring(2)}',
-          type: 'text',
-          duration: durationSeconds,
-        );
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.storyPublishedSuccess),
-              backgroundColor: Colors.green,
-            ),
+          final durationSeconds = _resolveStoryDurationSeconds();
+    
+        try {
+          if (_selectedMedia == null) {
+            await _storyService.createStory(
+              media: null,
+              text: _textController.text.trim(),
+              backgroundColor:
+                  '#${_backgroundColor.value.toRadixString(16).substring(2)}',
+              type: 'text',
+              duration: durationSeconds,
+            );
+            if (mounted) {
+              Navigator.pop(context);
+              Helpers.showSuccessSnackBar(context, l10n.storyPublishedSuccess);
+            }
+            return;
+          }
+    
+          // Dispose the video controller BEFORE enqueuing the upload
+          // to release any file locks.
+          if (_isVideo) {
+            _disposeVideoController();
+          }
+    
+          final jobId = DateTime.now().millisecondsSinceEpoch.toString();
+          final job = StoryUploadJob(
+            id: jobId,
+            type: type,
+            mediaPath: _selectedMedia?.path,
+            text: _textController.text.trim(),
+            backgroundColor: _selectedMedia == null
+                ? '#${_backgroundColor.value.toRadixString(16).substring(2)}'
+                : null,
+            durationSeconds: durationSeconds,
           );
-        }
-        return;
-      }
-
-      final jobId = DateTime.now().millisecondsSinceEpoch.toString();
-      final job = StoryUploadJob(
-        id: jobId,
-        type: type,
-        mediaPath: _selectedMedia?.path,
-        text: _textController.text.trim(),
-        backgroundColor: _selectedMedia == null
-            ? '#${_backgroundColor.value.toRadixString(16).substring(2)}'
-            : null,
-        durationSeconds: durationSeconds,
-      );
-
-      await StoryUploadQueue().enqueue(job);
-      await StoryBackgroundUploader.enqueue(job);
-
-      if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        Navigator.pop(context);
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Publication en cours...'),
-          ),
-        );
-      }
-    } catch (e) {
+    
+          await StoryUploadQueue().enqueue(job);
+          await StoryBackgroundUploader.enqueue(job);
+    
+          if (mounted) {
+            Navigator.pop(context);
+            Helpers.showSnackBar(context, 'Publication en cours...');
+          }    } catch (e) {
       setState(() {
         _isUploading = false;
       });
@@ -195,13 +222,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
         errorMessage = l10n.fileTooLarge;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$errorMessage\n${e.toString()}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      Helpers.showErrorSnackBar(context, '$errorMessage\n${e.toString()}');
     }
   }
 
@@ -418,11 +439,13 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
 
   int _resolveStoryDurationSeconds() {
     if (_isVideo) {
-      final seconds = _videoDuration?.inSeconds ?? 90;
-      if (seconds <= 0) return 90;
-      return seconds > 90 ? 90 : seconds;
+      // Default to 60 if duration is unknown, to pass backend validation.
+      final seconds = _videoDuration?.inSeconds ?? 60;
+      if (seconds <= 0) return 60; // Should not happen, but as a safeguard.
+      // Cap the duration at 60 seconds.
+      return seconds > 60 ? 60 : seconds;
     }
-    return 5;
+    return 5; // Default duration for images.
   }
 
   Widget _buildVideoPreview() {
@@ -431,7 +454,11 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
       return Container(
         color: Colors.black,
         child: const Center(
-          child: CircularProgressIndicator(color: Colors.white),
+          child: Icon(
+            Icons.play_circle_fill,
+            color: Colors.white70,
+            size: 72,
+          ),
         ),
       );
     }

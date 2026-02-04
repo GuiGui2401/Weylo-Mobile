@@ -1005,20 +1005,12 @@ class _ConfessionCardState extends State<ConfessionCard>
                 ElevatedButton(
                   onPressed: () {
                     if (selectedReason == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Veuillez choisir une raison.'),
-                        ),
-                      );
+                      Helpers.showSnackBar(context, 'Veuillez choisir une raison.');
                       return;
                     }
                     if (isOtherReason() &&
                         descriptionController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Veuillez ajouter une description.'),
-                        ),
-                      );
+                      Helpers.showSnackBar(context, 'Veuillez ajouter une description.');
                       return;
                     }
                     Navigator.pop(dialogContext, true);
@@ -1046,15 +1038,11 @@ class _ConfessionCardState extends State<ConfessionCard>
             : descriptionController.text.trim(),
       );
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Signalement envoyé')));
+        Helpers.showSuccessSnackBar(context, 'Signalement envoyé');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erreur: ${e.toString()}')));
+        Helpers.showErrorSnackBar(context, 'Erreur: ${e.toString()}');
       }
     } finally {
       descriptionController.dispose();
@@ -1081,21 +1069,11 @@ class _ConfessionCardState extends State<ConfessionCard>
                 await confessionService.deleteConfession(confession.id);
                 widget.onDeleted?.call();
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(l10n.postDeletedSuccess),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
+                  Helpers.showSuccessSnackBar(context, l10n.postDeletedSuccess);
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(l10n.errorMessage(e.toString())),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+                  Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
                 }
               }
             },

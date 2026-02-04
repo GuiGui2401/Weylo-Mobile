@@ -710,21 +710,11 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 await confessionService.deleteConfession(confession.id);
                 await profileProvider.loadOwnConfessions();
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(l10n.profileDeletePostSuccess),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
+                  Helpers.showSuccessSnackBar(context, l10n.profileDeletePostSuccess);
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(l10n.errorMessage(e.toString())),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+                  Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
                 }
               }
             },
@@ -764,11 +754,11 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     final future = _videoThumbnails.putIfAbsent(
       url,
       () => VideoThumbnail.thumbnailData(
-        video: url,
-        imageFormat: ImageFormat.JPEG,
-        quality: 75,
-        maxWidth: 512,
-      ),
+            video: url,
+            imageFormat: ImageFormat.JPEG,
+            quality: 75,
+            maxWidth: 512,
+          ).catchError((_) => null),
     );
 
     return FutureBuilder<Uint8List?>(
@@ -1202,12 +1192,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   onTap: () {
                     Navigator.pop(ctx);
                     Clipboard.setData(ClipboardData(text: appLink));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(l10n.copyToClipboardSuccess),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
+                    Helpers.showSuccessSnackBar(context, l10n.copyToClipboardSuccess);
                   },
                 ),
               ],

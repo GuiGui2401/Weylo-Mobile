@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/helpers.dart';
 import '../../services/group_service.dart';
 
 class CreateGroupScreen extends StatefulWidget {
@@ -113,17 +114,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.groupCreatedSuccess)));
+        Helpers.showSuccessSnackBar(context, l10n.groupCreatedSuccess);
         context.pop();
         context.push('/group/${group.id}');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.errorMessage(e.toString()))),
-        );
+        Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
       }
     } finally {
       if (mounted) {

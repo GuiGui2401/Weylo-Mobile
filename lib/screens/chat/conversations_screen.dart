@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -10,8 +8,7 @@ import '../../core/utils/helpers.dart';
 import '../../models/conversation.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/chat_service.dart';
-import '../../services/websocket_service.dart';
+import '../../providers/conversations_provider.dart';
 import '../../services/widgets/common/widgets.dart';
 import '../../services/widgets/stories/stories_bar.dart';
 
@@ -23,147 +20,40 @@ class ConversationsScreen extends StatefulWidget {
 }
 
 class _ConversationsScreenState extends State<ConversationsScreen> {
-  final ChatService _chatService = ChatService();
   final RefreshController _refreshController = RefreshController();
-  final WebSocketService _webSocket = WebSocketService();
-  StreamSubscription<WebSocketMessage>? _messageSubscription;
-
-  List<Conversation> _conversations = [];
-  bool _isLoading = false;
-  bool _hasError = false;
-  bool _hasLoadedForSession = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _subscribeToWebSocketEvents();
-  }
+  bool _hasInitialized = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_hasInitialized) return;
     final auth = Provider.of<AuthProvider>(context);
     if (auth.isAuthenticated) {
-      if (!_hasLoadedForSession) {
-        _hasLoadedForSession = true;
-        _loadConversations();
-      }
-    } else {
-      if (_hasLoadedForSession) {
-        _hasLoadedForSession = false;
-        setState(() {
-          _conversations = [];
-          _isLoading = false;
-          _hasError = false;
-        });
-      }
+      _hasInitialized = true;
+      final userId = auth.user?.id ?? 0;
+      context.read<ConversationsProvider>().init(userId);
     }
   }
 
   @override
   void dispose() {
-    _messageSubscription?.cancel();
-    _messageSubscription = null;
     _refreshController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadConversations() async {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
-
-    try {
-      final conversations = await _chatService.getConversations();
-      setState(() {
-        _conversations = conversations;
-        _sortConversations();
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _hasError = true;
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _subscribeToWebSocketEvents() {
-    _webSocket.connect();
-    _messageSubscription = _webSocket.messages.listen(_handleWebSocketMessage);
-  }
-
-  void _handleWebSocketMessage(WebSocketMessage message) {
-    if (!message.isChatMessage && !message.isNewMessage) return;
-    final chatMessage = ChatMessage.fromJson(message.data);
-    _applyIncomingMessage(chatMessage);
-  }
-
-  Future<void> _applyIncomingMessage(ChatMessage chatMessage) async {
-    if (!mounted) return;
-    final conversationId = chatMessage.conversationId;
-    if (conversationId == 0) return;
-
-    final currentUserId = context.read<AuthProvider>().user?.id ?? 0;
-    final existingIndex = _conversations.indexWhere(
-      (conv) => conv.id == conversationId,
-    );
-
-    if (existingIndex == -1) {
-      try {
-        final conversation = await _chatService.getConversation(conversationId);
-        if (!mounted) return;
-        setState(() {
-          _conversations.insert(0, conversation);
-          _sortConversations();
-        });
-      } catch (e) {
-        debugPrint(
-          '[Conversations] Failed to fetch conversation $conversationId: $e',
-        );
-      }
-      return;
-    }
-
-    setState(() {
-      final existing = _conversations[existingIndex];
-      final updated = existing.copyWith(
-        lastMessage: chatMessage,
-        lastMessageAt: chatMessage.createdAt,
-        messageCount: existing.messageCount + 1,
-        unreadCount: chatMessage.senderId != currentUserId
-            ? existing.unreadCount + 1
-            : existing.unreadCount,
-      );
-      _conversations.removeAt(existingIndex);
-      _conversations.insert(0, updated);
-      _sortConversations();
-    });
-  }
-
-  void _sortConversations() {
-    _conversations.sort((a, b) {
-      if (a.streakCount != b.streakCount) {
-        return b.streakCount.compareTo(a.streakCount);
-      }
-      final aTime = a.lastMessageAt ?? a.updatedAt ?? a.createdAt;
-      final bTime = b.lastMessageAt ?? b.updatedAt ?? b.createdAt;
-      return bTime.compareTo(aTime);
-    });
-  }
-
   Future<void> _onRefresh() async {
-    await _loadConversations();
+    await context.read<ConversationsProvider>().refresh();
     _refreshController.refreshCompleted();
   }
 
   void _showSearchDialog(BuildContext context) {
+    final conversations =
+        context.read<ConversationsProvider>().conversations;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) =>
-          _ConversationSearchSheet(conversations: _conversations),
+          _ConversationSearchSheet(conversations: conversations),
     );
   }
 
@@ -187,34 +77,39 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         children: [
           const StoriesBar(),
           Expanded(
-            child: _isLoading
-                ? const LoadingWidget()
-                : _hasError
-                    ? ErrorState(onRetry: _loadConversations)
-                    : _conversations.isEmpty
-                        ? EmptyState(
-                            icon: Icons.chat_bubble_outline,
-                            title: l10n.emptyConversationsTitle,
-                            subtitle: l10n.emptyConversationsSubtitle,
-                          )
-                        : SmartRefresher(
-                            controller: _refreshController,
-                            onRefresh: _onRefresh,
-                            child: ListView.builder(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 8),
-                              itemCount: _conversations.length,
-                              itemBuilder: (context, index) {
-                                return _ConversationTile(
-                                  conversation: _conversations[index],
-                                  onTap: () {
-                                    context
-                                        .push('/chat/${_conversations[index].id}');
-                                  },
-                                );
-                              },
-                            ),
-                          ),
+            child: Consumer<ConversationsProvider>(
+              builder: (context, convProvider, _) {
+                if (convProvider.isLoading &&
+                    convProvider.conversations.isEmpty) {
+                  return const LoadingWidget();
+                }
+                if (convProvider.hasError) {
+                  return ErrorState(onRetry: () => convProvider.refresh());
+                }
+                if (convProvider.conversations.isEmpty) {
+                  return EmptyState(
+                    icon: Icons.chat_bubble_outline,
+                    title: l10n.emptyConversationsTitle,
+                    subtitle: l10n.emptyConversationsSubtitle,
+                  );
+                }
+                return SmartRefresher(
+                  controller: _refreshController,
+                  onRefresh: _onRefresh,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: convProvider.conversations.length,
+                    itemBuilder: (context, index) {
+                      final conv = convProvider.conversations[index];
+                      return _ConversationTile(
+                        conversation: conv,
+                        onTap: () => context.push('/chat/${conv.id}'),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),

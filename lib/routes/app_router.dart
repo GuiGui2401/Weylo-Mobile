@@ -967,11 +967,7 @@ class _CreateConfessionScreenState extends State<_CreateConfessionScreen> {
 
     // Validate that there's either content or media
     if (content.isEmpty && _selectedImage == null && _selectedVideo == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!.addContentOrMediaError),
-        ),
-      );
+      Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.addContentOrMediaError);
       return;
     }
 
@@ -991,9 +987,7 @@ class _CreateConfessionScreenState extends State<_CreateConfessionScreen> {
       await ConfessionBackgroundUploader.enqueue(job);
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.statusSending)),
-        );
+        Helpers.showSnackBar(context, l10n.statusSending);
       }
       return;
     }
@@ -1008,21 +1002,13 @@ class _CreateConfessionScreenState extends State<_CreateConfessionScreen> {
 
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.postCreatedSuccess),
-          ),
-        );
+        Helpers.showSuccessSnackBar(context, l10n.postCreatedSuccess);
       }
     } catch (e) {
       debugPrint('Error creating confession: $e');
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.postCreateError(e.toString())),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, l10n.postCreateError(e.toString()));
       }
     }
   }
@@ -1192,23 +1178,11 @@ class _PrivacySettingsScreenState extends State<_PrivacySettingsScreen> {
       await _userService.unblockUser(user.username);
       setState(() => _blockedUsers.removeWhere((u) => u.id == user.id));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.userUnblocked(user.username),
-            ),
-          ),
-        );
+        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.userUnblocked(user.username));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
@@ -1376,15 +1350,7 @@ class _PrivacySettingsScreenState extends State<_PrivacySettingsScreen> {
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        AppLocalizations.of(
-                          context,
-                        )!.errorMessage(e.toString()),
-                      ),
-                    ),
-                  );
+                  Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
                 }
               }
             },
@@ -1476,9 +1442,7 @@ class _HelpScreen extends StatelessWidget {
                 await launchUrl(emailUri);
               } else {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.emailClientError)),
-                  );
+                  Helpers.showErrorSnackBar(context, l10n.emailClientError);
                 }
               }
             },
@@ -1689,22 +1653,12 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
           _avatarUrl = updatedUser.avatar;
           _isUploadingAvatar = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context)!.profilePhotoUpdated),
-          ),
-        );
+        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.profilePhotoUpdated);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isUploadingAvatar = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
@@ -1723,22 +1677,12 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
           _avatarUrl = null;
           _isUploadingAvatar = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context)!.profilePhotoDeleted),
-          ),
-        );
+        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.profilePhotoDeleted);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isUploadingAvatar = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
@@ -1764,20 +1708,12 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
 
         setState(() => _isLoading = false);
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.profileUpdated)),
-        );
+        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.profileUpdated);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
@@ -1854,22 +1790,12 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
           _coverUrl = updatedUser.coverUrl;
           _isUploadingCover = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context)!.profilePhotoUpdated),
-          ),
-        );
+        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.profilePhotoUpdated);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isUploadingCover = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
@@ -1888,22 +1814,12 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
           _coverUrl = null;
           _isUploadingCover = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context)!.profilePhotoDeleted),
-          ),
-        );
+        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.profilePhotoDeleted);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isUploadingCover = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
@@ -2121,11 +2037,7 @@ class _PremiumScreenState extends State<_PremiumScreen> {
       await _premiumService.purchasePass(plan: plan);
       await _loadPremiumStatus();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context)!.premiumActivated),
-          ),
-        );
+        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.premiumActivated);
         // Update user in auth provider
         final authProvider = context.read<AuthProvider>();
         if (authProvider.user != null) {
@@ -2134,13 +2046,7 @@ class _PremiumScreenState extends State<_PremiumScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     } finally {
       if (mounted) {
@@ -2162,25 +2068,13 @@ class _PremiumScreenState extends State<_PremiumScreen> {
       }
       await _loadPremiumStatus();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _passStatus?.autoRenew == true
+        Helpers.showSuccessSnackBar(context, _passStatus?.autoRenew == true
                   ? AppLocalizations.of(context)!.autoRenewEnabled
-                  : AppLocalizations.of(context)!.autoRenewDisabled,
-            ),
-          ),
-        );
+                  : AppLocalizations.of(context)!.autoRenewDisabled);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
@@ -2426,23 +2320,11 @@ class _NotificationsScreenState extends State<_NotificationsScreen> {
       await _notificationService.markAllAsRead();
       _loadNotifications();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.notificationsMarkedRead,
-            ),
-          ),
-        );
+        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.notificationsMarkedRead);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
@@ -2700,7 +2582,7 @@ class _StoryViewerScreenState extends State<_StoryViewerScreen> {
             story_view.StoryItem.pageVideo(
               story.mediaUrl!,
               controller: _storyController,
-              duration: Duration(seconds: story.duration),
+              duration: Duration(seconds: story.duration > 8 ? story.duration : 30),
               caption: story.content != null
                   ? Text(
                       story.content!,
@@ -2758,13 +2640,13 @@ class _StoryViewerScreenState extends State<_StoryViewerScreen> {
     return null;
   }
 
-  Future<void> _sendReplyToChat({
+  Future<int?> _sendReplyToChat({
     required String content,
     File? voiceFile,
     String? voiceEffect,
   }) async {
     final username = _storyUser?.username;
-    if (username == null || username.isEmpty) return;
+    if (username == null || username.isEmpty) return null;
 
     final conversation = await _chatService.startConversation(username);
     if (voiceFile != null) {
@@ -2773,12 +2655,13 @@ class _StoryViewerScreenState extends State<_StoryViewerScreen> {
         voice: voiceFile,
         voiceEffect: voiceEffect,
       );
-      return;
+      return conversation.id;
     }
 
     final trimmed = content.trim();
-    if (trimmed.isEmpty) return;
+    if (trimmed.isEmpty) return null;
     await _chatService.sendMessage(conversation.id, content: trimmed);
+    return conversation.id;
   }
 
   @override
@@ -2898,6 +2781,7 @@ class _StoryViewerScreenState extends State<_StoryViewerScreen> {
                     final story = _currentStory;
                     if (story == null) return;
                     try {
+                      int? conversationId;
                       if (voiceFile != null) {
                         await _replyService.sendVoiceReply(
                           storyId: story.id,
@@ -2905,7 +2789,7 @@ class _StoryViewerScreenState extends State<_StoryViewerScreen> {
                           voiceEffect: voiceEffect,
                           isAnonymous: isAnonymous,
                         );
-                        await _sendReplyToChat(
+                        conversationId = await _sendReplyToChat(
                           content: '',
                           voiceFile: voiceFile,
                           voiceEffect: voiceEffect,
@@ -2916,27 +2800,19 @@ class _StoryViewerScreenState extends State<_StoryViewerScreen> {
                           content: content,
                           isAnonymous: isAnonymous,
                         );
-                        await _sendReplyToChat(content: content);
+                        conversationId =
+                            await _sendReplyToChat(content: content);
                       }
-                      _toggleReplyMode();
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              AppLocalizations.of(context)!.storyReplySent,
-                            ),
-                          ),
-                        );
+                      if (mounted && conversationId != null) {
+                        Navigator.of(context).pop();
+                        context.push('/chat/$conversationId');
+                      } else if (mounted) {
+                        _toggleReplyMode();
+                        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.storyReplySent);
                       }
                     } catch (e) {
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              AppLocalizations.of(context)!.storyReplyError,
-                            ),
-                          ),
-                        );
+                        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.storyReplyError);
                       }
                     }
                   },
@@ -3028,7 +2904,7 @@ class _MyStoriesScreenState extends State<_MyStoriesScreen> {
             story_view.StoryItem.pageVideo(
               story.mediaUrl!,
               controller: _storyController,
-              duration: Duration(seconds: story.duration),
+              duration: Duration(seconds: story.duration > 8 ? story.duration : 30),
               caption: story.content != null
                   ? Text(
                       story.content!,
@@ -3099,17 +2975,9 @@ class _MyStoriesScreenState extends State<_MyStoriesScreen> {
           _loadMyStories();
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.storyDeleted)),
-        );
+        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.storyDeleted);
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
@@ -3423,13 +3291,7 @@ class _FollowersScreenState extends State<_FollowersScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
       setState(() => _isLoading = false);
     }
@@ -3444,13 +3306,7 @@ class _FollowersScreenState extends State<_FollowersScreen> {
       }
       _loadFollowers();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.errorMessage(e.toString()),
-          ),
-        ),
-      );
+      Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
     }
   }
 
@@ -3592,13 +3448,7 @@ class _FollowingScreenState extends State<_FollowingScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
       setState(() => _isLoading = false);
     }
@@ -3613,13 +3463,7 @@ class _FollowingScreenState extends State<_FollowingScreen> {
       }
       _loadFollowing();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.errorMessage(e.toString()),
-          ),
-        ),
-      );
+      Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
     }
   }
 
@@ -3834,13 +3678,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
       await _audioPlayer.play();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.audioPlaybackError(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.audioPlaybackError(e.toString()));
       }
     } finally {
       if (mounted) {
@@ -3862,13 +3700,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
       await controller.initialize();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.videoPlaybackError(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.videoPlaybackError(e.toString()));
       }
       await controller.dispose();
       return;
@@ -4025,11 +3857,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
         (_currentUserId != null && _currentUserId == _group?.creatorId);
 
     if (!canSend) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Seul le propriétaire du groupe peut écrire.'),
-        ),
-      );
+      Helpers.showErrorSnackBar(context, 'Seul le propriétaire du groupe peut écrire.');
       return;
     }
     if (content.isEmpty &&
@@ -4057,45 +3885,89 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
           _editingMessageId = null;
           _isSending = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.messageEdited)),
-        );
+        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.messageEdited);
         _loadMessages();
         return;
       }
 
-      // Handle reply
+      // Capture state before clearing
       final replyToId = _replyToMessage?['id'];
-
-      final voice = (_selectedImage != null || _selectedVideo != null)
+      final capturedImage = _selectedImage;
+      final capturedVideo = _selectedVideo;
+      final capturedVoice = (_selectedImage != null || _selectedVideo != null)
           ? null
           : _voiceFile;
+      final capturedVoiceEffect = _selectedVoiceEffect;
+      final capturedReplyToMessage = _replyToMessage;
 
-      await _groupService.sendMessage(
-        groupId: int.tryParse(widget.groupId) ?? 0,
-        content: content,
-        image: _selectedImage,
-        video: _selectedVideo,
-        voice: voice,
-        replyToId: replyToId,
-        voiceEffect: _selectedVoiceEffect != null
-            ? VoiceEffectsService.effectToString(_selectedVoiceEffect!)
+      // Determine temp message type
+      String tempType = 'text';
+      if (capturedVoice != null) {
+        tempType = 'voice';
+      } else if (capturedVideo != null) {
+        tempType = 'video';
+      } else if (capturedImage != null) {
+        tempType = 'image';
+      }
+
+      // Create optimistic temp message
+      final tempId = -DateTime.now().millisecondsSinceEpoch;
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final currentUser = authProvider.user;
+      final tempMessage = <String, dynamic>{
+        'id': tempId,
+        'content': content,
+        'type': tempType,
+        'sender_id': _currentUserId,
+        'is_mine': true,
+        '_sending': true,
+        'created_at': DateTime.now().toIso8601String(),
+        'sender': currentUser != null
+            ? {
+                'id': currentUser.id,
+                'full_name': currentUser.fullName,
+                'username': currentUser.username,
+                'avatar': currentUser.avatar,
+              }
             : null,
-      );
+        if (capturedReplyToMessage != null)
+          'reply_to': capturedReplyToMessage,
+      };
 
+      // Immediately insert temp message and clear input
       _messageController.clear();
       setState(() {
+        _messages.insert(0, tempMessage);
         _selectedImage = null;
         _selectedVideo = null;
         _voiceFile = null;
         _selectedVoiceEffect = null;
         _replyToMessage = null;
+      });
+      _scrollToBottom();
+
+      await _groupService.sendMessage(
+        groupId: int.tryParse(widget.groupId) ?? 0,
+        content: content,
+        image: capturedImage,
+        video: capturedVideo,
+        voice: capturedVoice,
+        replyToId: replyToId,
+        voiceEffect: capturedVoiceEffect != null
+            ? VoiceEffectsService.effectToString(capturedVoiceEffect)
+            : null,
+      );
+
+      setState(() {
         _isSending = false;
       });
 
+      // Reload to get the real message from server
       _loadMessages();
     } catch (e) {
+      // Remove temp message on failure
       setState(() {
+        _messages.removeWhere((m) => m['id'] is int && (m['id'] as int) < 0);
         _isSending = false;
       });
       if (mounted) {
@@ -4104,18 +3976,12 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
             ? _voiceDebugInfo(_voiceFile!)
             : null;
         final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              voiceInfo != null
+        Helpers.showErrorSnackBar(context, voiceInfo != null
                   ? l10n.errorWithDebug(
                       l10n.errorMessage(errorMessage),
                       voiceInfo,
                     )
-                  : l10n.errorMessage(errorMessage),
-            ),
-          ),
-        );
+                  : l10n.errorMessage(errorMessage));
       }
     }
   }
@@ -4206,10 +4072,14 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/fond.png'),
+            image: const AssetImage('assets/images/fond.png'),
             fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(
+              Colors.black.withOpacity(0.4),
+              BlendMode.darken,
+            ),
           ),
         ),
         child: Column(
@@ -4485,23 +4355,56 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
               ),
 
             if (!canSend)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
+              // Afficher le message "owner only" dans le même style que la barre de saisie
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(18),
                 ),
-                child: Text(
-                  'Seul le propriétaire du groupe peut écrire.',
-                  style: TextStyle(
-                    color:
-                        Theme.of(context).textTheme.bodySmall?.color ??
-                        AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).scaffoldBackgroundColor.withOpacity(0.85),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
+                    ),
+                    child: SafeArea(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.lock_outline,
+                            size: 18,
+                            color: Theme.of(context).textTheme.bodySmall?.color ??
+                                AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Seul le propriétaire du groupe peut écrire.',
+                            style: TextStyle(
+                              color:
+                                  Theme.of(context).textTheme.bodySmall?.color ??
+                                  AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ),
 
+            if (canSend)
             // Input area
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
@@ -4533,7 +4436,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                                 ? AppColors.primary
                                 : Colors.grey,
                           ),
-                          onPressed: canSend ? _pickImage : null,
+                          onPressed: _pickImage,
                         ),
                         IconButton(
                           icon: Icon(
@@ -4542,7 +4445,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                                 ? AppColors.primary
                                 : Colors.grey,
                           ),
-                          onPressed: canSend ? _pickVideo : null,
+                          onPressed: _pickVideo,
                         ),
                         IconButton(
                           icon: Icon(
@@ -4552,7 +4455,6 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                                 : Colors.grey,
                           ),
                           onPressed: () {
-                            if (!canSend) return;
                             setState(() {
                               _showVoiceRecorder = !_showVoiceRecorder;
                             });
@@ -4561,13 +4463,10 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                         Expanded(
                           child: TextField(
                             controller: _messageController,
-                            enabled: canSend,
                             decoration: InputDecoration(
                               hintText: _editingMessageId != null
                                   ? l10n.editMessageHint
-                                  : (canSend
-                                        ? l10n.messageInputHint
-                                        : 'Seul le propriétaire peut écrire.'),
+                                  : l10n.messageInputHint,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(24),
                                 borderSide: BorderSide.none,
@@ -4579,7 +4478,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                                 vertical: 8,
                               ),
                             ),
-                            onSubmitted: (_) => canSend ? _sendMessage() : null,
+                            onSubmitted: (_) => _sendMessage(),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -4596,7 +4495,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                                   Icons.send,
                                   color: AppColors.primary,
                                 ),
-                                onPressed: canSend ? _sendMessage : null,
+                                onPressed: _sendMessage,
                               ),
                       ],
                     ),
@@ -4886,11 +4785,11 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
     final future = _videoThumbnails.putIfAbsent(
       url,
       () => VideoThumbnail.thumbnailData(
-        video: url,
-        imageFormat: ImageFormat.JPEG,
-        quality: 70,
-        maxWidth: 720,
-      ),
+            video: url,
+            imageFormat: ImageFormat.JPEG,
+            quality: 70,
+            maxWidth: 720,
+          ).catchError((_) => null),
     );
 
     return GestureDetector(
@@ -4981,11 +4880,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                   ClipboardData(text: message['content'] ?? ''),
                 );
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(AppLocalizations.of(context)!.messageCopied),
-                  ),
-                );
+                Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.messageCopied);
               },
             ),
           ],
@@ -5016,19 +4911,9 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                 setState(() {
                   _messages.removeWhere((m) => m['id'] == messageId);
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(AppLocalizations.of(context)!.messageDeleted),
-                  ),
-                );
+                Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.messageDeleted);
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      AppLocalizations.of(context)!.errorMessage(e.toString()),
-                    ),
-                  ),
-                );
+                Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -5158,13 +5043,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                   if (_group?.inviteCode != null) {
                     Clipboard.setData(ClipboardData(text: _group!.inviteCode));
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          AppLocalizations.of(context)!.inviteCodeCopied,
-                        ),
-                      ),
-                    );
+                    Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.inviteCodeCopied);
                   }
                 },
               ),
@@ -5199,25 +5078,11 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                     setState(() {
                       _group = updated;
                     });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          value
+                    Helpers.showSuccessSnackBar(context, value
                               ? 'Seul le propriétaire peut écrire.'
-                              : 'Les membres peuvent écrire.',
-                        ),
-                      ),
-                    );
+                              : 'Les membres peuvent écrire.');
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          AppLocalizations.of(
-                            context,
-                          )!.errorMessage(e.toString()),
-                        ),
-                      ),
-                    );
+                    Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
                   }
                 },
               ),
@@ -5246,21 +5111,9 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                       int.tryParse(widget.groupId) ?? 0,
                     );
                     await _loadGroup();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          AppLocalizations.of(context)!.newInviteCode(newCode),
-                        ),
-                      ),
-                    );
+                    Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.newInviteCode(newCode));
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          AppLocalizations.of(context)!.regenerateInviteError,
-                        ),
-                      ),
-                    );
+                    Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.regenerateInviteError);
                   }
                 },
               ),
@@ -5313,20 +5166,10 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                 );
                 Navigator.pop(context);
                 context.go('/groups');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(AppLocalizations.of(context)!.groupDeleted),
-                  ),
-                );
+                Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.groupDeleted);
               } catch (e) {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      AppLocalizations.of(context)!.errorMessage(e.toString()),
-                    ),
-                  ),
-                );
+                Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -5385,11 +5228,7 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
             onPressed: () {
               Clipboard.setData(ClipboardData(text: _group!.inviteCode));
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(AppLocalizations.of(context)!.inviteCodeCopied),
-                ),
-              );
+              Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.inviteCodeCopied);
             },
           ),
         ],
@@ -5619,21 +5458,9 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                   );
                   Navigator.pop(context);
                   _loadGroup();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(AppLocalizations.of(context)!.groupUpdated),
-                    ),
-                  );
+                  Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.groupUpdated);
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        AppLocalizations.of(
-                          context,
-                        )!.errorMessage(e.toString()),
-                      ),
-                    ),
-                  );
+                  Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
                 }
               },
               child: Text(AppLocalizations.of(context)!.saveAction),
@@ -5663,22 +5490,10 @@ class _GroupChatScreenState extends State<_GroupChatScreen> {
                 );
                 Navigator.pop(context);
                 context.go('/groups');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      AppLocalizations.of(context)!.leftGroupSuccess,
-                    ),
-                  ),
-                );
+                Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.leftGroupSuccess);
               } catch (e) {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      AppLocalizations.of(context)!.errorMessage(e.toString()),
-                    ),
-                  ),
-                );
+                Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -5908,23 +5723,9 @@ class _MembersListWidgetState extends State<_MembersListWidget> {
                       );
                       _loadMembers();
                       widget.onMemberRemoved();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            AppLocalizations.of(context)!.memberRemoved,
-                          ),
-                        ),
-                      );
+                      Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.memberRemoved);
                     } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            AppLocalizations.of(
-                              context,
-                            )!.errorMessage(e.toString()),
-                          ),
-                        ),
-                      );
+                      Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
                     }
                   }
                 }
@@ -5977,11 +5778,15 @@ class _AnonymousMessageDetailScreenState
   bool _isSharingStatus = false;
   final TextEditingController _replyController = TextEditingController();
   final GlobalKey _statusShareKey = GlobalKey();
+  bool _statusAssetsReady = false;
 
   @override
   void initState() {
     super.initState();
     _loadMessage();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureStatusAssetsReady();
+    });
   }
 
   @override
@@ -6006,13 +5811,7 @@ class _AnonymousMessageDetailScreenState
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
@@ -6058,12 +5857,7 @@ class _AnonymousMessageDetailScreenState
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context)!.revealIdentitySuccess),
-            backgroundColor: Colors.green,
-          ),
-        );
+        Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.revealIdentitySuccess);
       }
     } catch (e) {
       setState(() {
@@ -6081,25 +5875,14 @@ class _AnonymousMessageDetailScreenState
           context.push('/wallet');
           return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
 
   Future<void> _replyOnce() async {
     if (_message == null || _replyController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!.enterMessageError),
-        ),
-      );
+      Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.enterMessageError);
       return;
     }
 
@@ -6128,24 +5911,20 @@ class _AnonymousMessageDetailScreenState
           final replyContent = _message?.content ?? '';
           await _chatService.sendMessage(conversationId, content: sentContent);
           _replyController.clear();
+          // Laisser le serveur indexer le message avant de naviguer
+          await Future.delayed(const Duration(milliseconds: 300));
           final replyTitle = Uri.encodeComponent(
             AppLocalizations.of(context)!.anonymousMessage,
           );
           final replyEncoded = Uri.encodeComponent(replyContent);
           final sentEncoded = Uri.encodeComponent(sentContent);
-          context.go(
+          if (!mounted) return;
+          context.push(
             '/chat/$conversationId?reply_title=$replyTitle&reply_content=$replyEncoded&sent_content=$sentEncoded',
           );
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context)!.conversationStarted),
-              backgroundColor: Colors.green,
-            ),
-          );
+          Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.conversationStarted);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(AppLocalizations.of(context)!.replySent)),
-          );
+          Helpers.showSuccessSnackBar(context, AppLocalizations.of(context)!.replySent);
         }
       }
     } catch (e) {
@@ -6153,14 +5932,7 @@ class _AnonymousMessageDetailScreenState
         _isReplying = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        Helpers.showErrorSnackBar(context, AppLocalizations.of(context)!.errorMessage(e.toString()));
       }
     }
   }
@@ -6183,13 +5955,12 @@ class _AnonymousMessageDetailScreenState
     }
     try {
       await Future.delayed(const Duration(milliseconds: 80));
+      await _ensureStatusAssetsReady();
 
       final messageId = _message?.id;
       if (messageId == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.messageNotFound)),
-          );
+          Helpers.showErrorSnackBar(context, l10n.messageNotFound);
         }
         return;
       }
@@ -6206,9 +5977,9 @@ class _AnonymousMessageDetailScreenState
         throw Exception('status_capture_missing');
       }
 
-      await WidgetsBinding.instance.endOfFrame;
+      await _waitForStatusPaint(boundary);
       if (boundary.debugNeedsPaint) {
-        await Future.delayed(const Duration(milliseconds: 32));
+        throw Exception('status_capture_failed');
       }
       final image = await boundary.toImage(pixelRatio: 2.5);
       final byteData = await image.toByteData(format: ImageByteFormat.png);
@@ -6227,43 +5998,36 @@ class _AnonymousMessageDetailScreenState
 
       try {
         await Share.shareXFiles([XFile(file.path)]);
-      } on Error catch (e) {
-        if (e.toString().contains('LateInitializationError')) {
-          throw Exception('share_failed');
-        }
-        rethrow;
+      } catch (_) {
+        // share_plus peut lancer LateInitializationError en release;
+        // le dialog de partage a quand même été affiché, on continue.
       }
-      await _openWhatsApp();
 
-      final username = context.read<AuthProvider>().user?.username ??
-          _message?.recipient?.username;
-      if (username != null && username.isNotEmpty) {
-        final shareUrl = DeepLinkService.getAnonymousMessageShareLink(username);
-        await Clipboard.setData(ClipboardData(text: shareUrl));
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.copyToClipboardSuccess)),
-          );
+      try {
+        await _openWhatsApp();
+      } catch (_) {}
+
+      try {
+        final username = context.read<AuthProvider>().user?.username ??
+            _message?.recipient?.username;
+        if (username != null && username.isNotEmpty) {
+          final shareUrl =
+              DeepLinkService.getAnonymousMessageShareLink(username);
+          await Clipboard.setData(ClipboardData(text: shareUrl));
+          if (mounted) {
+            Helpers.showSuccessSnackBar(context, l10n.copyToClipboardSuccess);
+          }
         }
-      }
+      } catch (_) {}
     } catch (e) {
       if (mounted) {
         final errorText = e.toString();
         final isCaptureError =
             errorText.contains('status_capture_missing') ||
             errorText.contains('status_capture_failed');
-        final isShareError = errorText.contains('share_failed');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isCaptureError
+        Helpers.showErrorSnackBar(context, isCaptureError
                   ? 'Impossible de generer l\'image du statut WhatsApp.'
-                  : isShareError
-                  ? 'Impossible d\'ouvrir le partage WhatsApp.'
-                  : l10n.errorMessage(errorText),
-            ),
-          ),
-        );
+                  : l10n.errorMessage(errorText));
       }
     } finally {
       if (mounted) {
@@ -6272,6 +6036,22 @@ class _AnonymousMessageDetailScreenState
         });
       }
     }
+  }
+
+  Future<void> _waitForStatusPaint(RenderRepaintBoundary boundary) async {
+    for (var i = 0; i < 5; i++) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!boundary.debugNeedsPaint) {
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 16));
+    }
+  }
+
+  Future<void> _ensureStatusAssetsReady() async {
+    if (_statusAssetsReady || !mounted) return;
+    await precacheImage(const AssetImage('assets/logo.jpg'), context);
+    _statusAssetsReady = true;
   }
 
   Future<void> _openWhatsApp() async {
@@ -6286,9 +6066,7 @@ class _AnonymousMessageDetailScreenState
       return;
     }
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('WhatsApp indisponible.')),
-      );
+      Helpers.showErrorSnackBar(context, 'WhatsApp indisponible.');
     }
   }
 
@@ -6298,75 +6076,200 @@ class _AnonymousMessageDetailScreenState
     return SizedBox(
       width: 720,
       height: 1280,
-      child: Container(
-        color: Colors.white,
-        child: Column(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withOpacity(0.15),
+              AppColors.secondary.withOpacity(0.18),
+              const Color(0xFFFFFFFF),
+            ],
+          ),
+        ),
+        child: Stack(
           children: [
-            const SizedBox(height: 90),
-            Container(
-              width: 110,
-              height: 110,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
+            Positioned(
+              top: -120,
+              right: -80,
+              child: _statusGlowCircle(
+                diameter: 260,
+                color: AppColors.secondary.withOpacity(0.22),
+              ),
+            ),
+            Positioned(
+              bottom: -140,
+              left: -60,
+              child: _statusGlowCircle(
+                diameter: 300,
+                color: AppColors.primary.withOpacity(0.18),
+              ),
+            ),
+            Positioned(
+              top: 120,
+              left: 48,
+              right: 48,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 14,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        gradient: AppColors.primaryGradient,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.question_answer_outlined,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Message anonyme',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Center(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 56),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(36),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 24,
+                      offset: const Offset(0, 14),
+                    ),
+                  ],
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 34,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        maxLines: 10,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 30,
+                          height: 1.35,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'Repondre sur Weylo',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 70,
+              left: 0,
+              right: 0,
+              child: Column(
+                children: [
+                  Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 14,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset(
+                      'assets/logo.jpg',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Weylo',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Image.asset(
-                'assets/logo.jpg',
-                fit: BoxFit.cover,
-              ),
-            ),
-            const SizedBox(height: 28),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 56),
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(28),
-              ),
-              padding: const EdgeInsets.all(8),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 28,
-                  vertical: 32,
-                ),
-                child: Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  maxLines: 10,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 30,
-                    height: 1.3,
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-            const Spacer(),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 48),
-              child: Text(
-                'Weylo',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
-                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _statusGlowCircle({required double diameter, required Color color}) {
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
       ),
     );
   }
@@ -6437,17 +6340,13 @@ class _AnonymousMessageDetailScreenState
                 if (value == 'report') {
                   await _messageService.reportMessage(widget.messageId);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.messageReported)),
-                    );
+                    Helpers.showSuccessSnackBar(context, l10n.messageReported);
                   }
                 } else if (value == 'delete') {
                   await _messageService.deleteMessage(widget.messageId);
                   if (mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.messageDeleted)),
-                    );
+                    Helpers.showSuccessSnackBar(context, l10n.messageDeleted);
                   }
                 }
               },
@@ -6465,6 +6364,8 @@ class _AnonymousMessageDetailScreenState
                       child: Image.asset(
                         'assets/images/fond.png',
                         fit: BoxFit.cover,
+                        color: Colors.black.withOpacity(0.4),
+                        colorBlendMode: BlendMode.darken,
                       ),
                     ),
                     SafeArea(
@@ -6846,11 +6747,13 @@ class _AnonymousMessageDetailScreenState
                         ),
                       ),
                     ),
-                    Offstage(
-                      offstage: true,
-                      child: RepaintBoundary(
-                        key: _statusShareKey,
-                        child: _buildStatusShareCard(context),
+                    IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.01,
+                        child: RepaintBoundary(
+                          key: _statusShareKey,
+                          child: _buildStatusShareCard(context),
+                        ),
                       ),
                     ),
                   ],

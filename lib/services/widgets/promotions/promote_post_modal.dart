@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/helpers.dart';
 import '../../../core/utils/media_utils.dart';
 import '../../../models/confession.dart';
 import '../../../providers/auth_provider.dart';
@@ -304,22 +305,12 @@ class _PromotePostModalState extends State<PromotePostModal>
       widget.onPromoted?.call();
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Boost lancé avec succès.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        Helpers.showSuccessSnackBar(context, 'Boost lancé avec succès.');
       }
     } catch (e) {
       setState(() => _isPromoting = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        Helpers.showErrorSnackBar(context, 'Erreur: ${e.toString()}');
       }
     }
   }
@@ -501,11 +492,7 @@ class _PromotePostModalState extends State<PromotePostModal>
                             );
                           } else {
                             if (_selectedVideos.length >= 5) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Maximum 5 vidéos.'),
-                                ),
-                              );
+                              Helpers.showSnackBar(context, 'Maximum 5 vidéos.');
                               return;
                             }
                             _selectedVideos.add(confession);

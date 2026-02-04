@@ -29,7 +29,7 @@ class Story {
     this.mediaUrl,
     this.thumbnailUrl,
     this.content,
-    this.duration = 5,
+    this.duration = 8,
     this.status = StoryStatus.active,
     this.viewsCount = 0,
     this.backgroundColor,
@@ -55,7 +55,7 @@ class Story {
       mediaUrl: json['media_url'] ?? json['mediaUrl'],
       thumbnailUrl: json['thumbnail_url'] ?? json['thumbnailUrl'],
       content: json['content'],
-      duration: json['duration'] ?? 5,
+      duration: json['duration'] ?? 8,
       status: json['status'] == 'expired'
           ? StoryStatus.expired
           : StoryStatus.active,

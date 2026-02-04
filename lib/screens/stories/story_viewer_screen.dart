@@ -209,9 +209,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
         _comments.insert(0, comment);
       });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.commentAddError)));
+      Helpers.showErrorSnackBar(context, l10n.commentAddError);
     }
   }
 
@@ -444,13 +442,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                           );
                         }
                         _toggleReplyMode();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.storyReplySent)),
-                        );
+                        Helpers.showSuccessSnackBar(context, l10n.storyReplySent);
                       } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.storyReplySendError)),
-                        );
+                        Helpers.showErrorSnackBar(context, l10n.storyReplySendError);
                       }
                     },
                 onClose: _toggleReplyMode,

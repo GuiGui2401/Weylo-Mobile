@@ -8,6 +8,7 @@ import 'package:lottie/lottie.dart';
 import 'package:weylo_mobile/core/constants/api_constants.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/helpers.dart';
 import '../../core/utils/media_utils.dart';
 import '../../models/confession.dart';
 import '../../models/gift.dart';
@@ -616,11 +617,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final future = _videoThumbnails.putIfAbsent(
       url,
       () => VideoThumbnail.thumbnailData(
-        video: url,
-        imageFormat: ImageFormat.JPEG,
-        quality: 75,
-        maxWidth: 512,
-      ),
+            video: url,
+            imageFormat: ImageFormat.JPEG,
+            quality: 75,
+            maxWidth: 512,
+          ).catchError((_) => null),
     );
 
     return FutureBuilder<Uint8List?>(
@@ -676,15 +677,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               try {
                 await _userService.blockUser(username);
                 if (mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(l10n.userBlocked)));
+                  Helpers.showSuccessSnackBar(context, l10n.userBlocked);
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.errorMessage(e.toString()))),
-                  );
+                  Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
                 }
               }
             },
@@ -764,15 +761,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                     description: controller.text,
                   );
                   if (mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text(l10n.reportSent)));
+                    Helpers.showSuccessSnackBar(context, l10n.reportSent);
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.errorMessage(e.toString()))),
-                    );
+                    Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
                   }
                 }
               },

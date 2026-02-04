@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/feed_provider.dart';
+import '../../providers/messages_provider.dart';
+import '../../providers/conversations_provider.dart';
+import '../../providers/wallet_provider.dart';
 import '../messages/messages_screen.dart';
 import '../confessions/confessions_screen.dart';
 import '../chat/conversations_screen.dart';
@@ -15,7 +19,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   late final List<Key> _screenKeys;
 
@@ -31,10 +35,48 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _screenKeys = List<Key>.generate(_screens.length, (_) => UniqueKey());
-    // Refresh user data on startup
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthProvider>().refreshUser();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshAllProviders();
+    }
+  }
+
+  void _refreshAllProviders() {
+    context.read<MessagesProvider>().refresh();
+    context.read<FeedProvider>().refresh();
+    context.read<ConversationsProvider>().refresh();
+    context.read<AuthProvider>().refreshUser();
+    context.read<WalletProvider>().loadWallet();
+  }
+
+  void _refreshForTab(int index) {
+    switch (index) {
+      case 0:
+        context.read<MessagesProvider>().refresh();
+        break;
+      case 1:
+        context.read<FeedProvider>().refresh();
+        break;
+      case 2:
+        context.read<ConversationsProvider>().refresh();
+        break;
+      case 4:
+        context.read<AuthProvider>().refreshUser();
+        break;
+    }
   }
 
   @override
@@ -70,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }
               _currentIndex = index;
             });
+            _refreshForTab(index);
           },
           type: BottomNavigationBarType.fixed,
           selectedItemColor: Theme.of(context).brightness == Brightness.dark

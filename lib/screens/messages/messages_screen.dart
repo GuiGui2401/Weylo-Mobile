@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/message.dart';
-import '../../services/message_service.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/messages_provider.dart';
+import '../../services/deep_link_service.dart';
 import '../../services/widgets/common/widgets.dart';
 import '../../services/widgets/messages/message_card.dart';
 
@@ -20,21 +24,16 @@ class MessagesScreen extends StatefulWidget {
 class _MessagesScreenState extends State<MessagesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final MessageService _messageService = MessageService();
   final RefreshController _receivedRefreshController = RefreshController();
   final RefreshController _sentRefreshController = RefreshController();
-
-  List<AnonymousMessage> _receivedMessages = [];
-  List<AnonymousMessage> _sentMessages = [];
-  bool _isLoading = true;
-  bool _hasError = false;
-  MessageStats? _stats;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MessagesProvider>().loadData();
+    });
   }
 
   @override
@@ -45,35 +44,8 @@ class _MessagesScreenState extends State<MessagesScreen>
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
-
-    try {
-      final results = await Future.wait([
-        _messageService.getInbox(),
-        _messageService.getSentMessages(),
-        _messageService.getStats(),
-      ]);
-
-      setState(() {
-        _receivedMessages = (results[0] as PaginatedMessages).messages;
-        _sentMessages = (results[1] as PaginatedMessages).messages;
-        _stats = results[2] as MessageStats;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _hasError = true;
-        _isLoading = false;
-      });
-    }
-  }
-
   Future<void> _onRefresh({required bool isReceived}) async {
-    await _loadData();
+    await context.read<MessagesProvider>().refresh();
     if (isReceived) {
       _receivedRefreshController.refreshCompleted();
     } else {
@@ -84,6 +56,8 @@ class _MessagesScreenState extends State<MessagesScreen>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final stats = context.watch<MessagesProvider>().stats;
+    final username = context.watch<AuthProvider>().user?.username;
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -91,60 +65,88 @@ class _MessagesScreenState extends State<MessagesScreen>
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(l10n.inboxTabReceived),
-                  if (_stats != null && _stats!.unreadCount > 0) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${_stats!.unreadCount}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(username != null ? 100 : 48),
+          child: Column(
+            children: [
+              if (username != null)
+                _buildShareLinkBanner(username, l10n),
+              TabBar(
+                controller: _tabController,
+                tabs: [
+                  Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(l10n.inboxTabReceived),
+                        if (stats != null && stats.unreadCount > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${stats.unreadCount}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
+                  ),
+                  Tab(text: l10n.inboxTabSent),
                 ],
               ),
-            ),
-            Tab(text: l10n.inboxTabSent),
-          ],
+            ],
+          ),
         ),
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/fond.png'),
+            image: const AssetImage('assets/images/fond.png'),
             fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(
+              Colors.black.withOpacity(0.4),
+              BlendMode.darken,
+            ),
           ),
         ),
-        child: _isLoading
-            ? const LoadingWidget()
-            : _hasError
-            ? ErrorState(onRetry: _loadData)
-            : TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildMessagesList(_receivedMessages, isReceived: true),
-                  _buildMessagesList(_sentMessages, isReceived: false),
-                ],
-              ),
+        child: Consumer<MessagesProvider>(
+          builder: (context, messagesProvider, _) {
+            if (messagesProvider.isLoading &&
+                messagesProvider.receivedMessages.isEmpty) {
+              return const LoadingWidget();
+            }
+            if (messagesProvider.hasError) {
+              return ErrorState(
+                onRetry: () => messagesProvider.refresh(),
+              );
+            }
+            return TabBarView(
+              controller: _tabController,
+              children: [
+                _buildMessagesList(
+                  messagesProvider.receivedMessages,
+                  isReceived: true,
+                ),
+                _buildMessagesList(
+                  messagesProvider.sentMessages,
+                  isReceived: false,
+                ),
+              ],
+            );
+          },
+        ),
       ),
       floatingActionButton: Container(
         width: 56,
@@ -174,6 +176,57 @@ class _MessagesScreenState extends State<MessagesScreen>
     );
   }
 
+  Widget _buildShareLinkBanner(String username, AppLocalizations l10n) {
+    final shareUrl = DeepLinkService.getAnonymousMessageShareLink(username);
+    return GestureDetector(
+      onTap: () async {
+        await Clipboard.setData(ClipboardData(text: shareUrl));
+        if (mounted) {
+          Helpers.showSuccessSnackBar(context, l10n.copyToClipboardSuccess);
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.link, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                shareUrl,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () async {
+                await Clipboard.setData(ClipboardData(text: shareUrl));
+                if (mounted) {
+                  Helpers.showSuccessSnackBar(context, l10n.copyToClipboardSuccess);
+                }
+              },
+              child: const Icon(Icons.copy, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 12),
+            GestureDetector(
+              onTap: () => Share.share(shareUrl),
+              child: const Icon(Icons.share, color: Colors.white, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessagesList(
     List<AnonymousMessage> messages, {
     required bool isReceived,
@@ -188,6 +241,8 @@ class _MessagesScreenState extends State<MessagesScreen>
       subtitle: isReceived ? l10n.emptyInboxSubtitle : l10n.emptySentSubtitle,
       buttonText: isReceived ? l10n.emptyInboxButton : l10n.emptySentButton,
       onButtonPressed: () => context.push('/send-message'),
+      titleColor: Colors.white,
+      subtitleColor: Colors.white70,
     );
 
     return SmartRefresher(

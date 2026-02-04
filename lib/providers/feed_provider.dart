@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/confession.dart';
 import '../models/user.dart';
 import '../services/confession_service.dart';
@@ -20,6 +22,7 @@ class FeedProvider extends ChangeNotifier {
   String? _error;
   String? _recommendationsError;
   bool _contactsPermissionDenied = false;
+  final Set<int> _likeInFlight = {};
 
   List<Confession> get confessions => _confessions;
   List<User> get contactRecommendations => _contactRecommendations;
@@ -29,6 +32,10 @@ class FeedProvider extends ChangeNotifier {
   String? get error => _error;
   String? get recommendationsError => _recommendationsError;
   bool get contactsPermissionDenied => _contactsPermissionDenied;
+
+  static const String _cacheKey = 'feed_cache';
+  static const String _cacheTimestampKey = 'feed_cache_ts';
+  static const Duration _maxCacheAge = Duration(minutes: 30);
 
   FeedProvider() {
     _setupRealTimeUpdates();
@@ -81,6 +88,7 @@ class FeedProvider extends ChangeNotifier {
 
       if (refresh) {
         _confessions = response.confessions;
+        _cacheFeed();
       } else {
         _confessions.addAll(response.confessions);
       }
@@ -137,6 +145,11 @@ class FeedProvider extends ChangeNotifier {
     }
   }
 
+  void insertAtTop(Confession confession) {
+    _confessions.insert(0, confession);
+    notifyListeners();
+  }
+
   Future<void> refresh() async {
     await loadConfessions(refresh: true);
   }
@@ -146,8 +159,10 @@ class FeedProvider extends ChangeNotifier {
   }
 
   Future<bool> likeConfession(int confessionId) async {
+    if (_likeInFlight.contains(confessionId)) return false;
+    _likeInFlight.add(confessionId);
     try {
-      await _confessionService.likeConfession(confessionId);
+      // Mise à jour optimiste
       final index = _confessions.indexWhere((c) => c.id == confessionId);
       if (index != -1) {
         final confession = _confessions[index];
@@ -157,16 +172,10 @@ class FeedProvider extends ChangeNotifier {
         );
         notifyListeners();
       }
+      await _confessionService.likeConfession(confessionId);
       return true;
     } catch (e) {
-      if (kDebugMode) print('Error liking confession: $e');
-      return false;
-    }
-  }
-
-  Future<bool> unlikeConfession(int confessionId) async {
-    try {
-      await _confessionService.unlikeConfession(confessionId);
+      // Annuler la mise à jour optimiste en cas d'erreur
       final index = _confessions.indexWhere((c) => c.id == confessionId);
       if (index != -1) {
         final confession = _confessions[index];
@@ -176,10 +185,44 @@ class FeedProvider extends ChangeNotifier {
         );
         notifyListeners();
       }
+      if (kDebugMode) print('Error liking confession: $e');
+      return false;
+    } finally {
+      _likeInFlight.remove(confessionId);
+    }
+  }
+
+  Future<bool> unlikeConfession(int confessionId) async {
+    if (_likeInFlight.contains(confessionId)) return false;
+    _likeInFlight.add(confessionId);
+    try {
+      // Mise à jour optimiste
+      final index = _confessions.indexWhere((c) => c.id == confessionId);
+      if (index != -1) {
+        final confession = _confessions[index];
+        _confessions[index] = confession.copyWith(
+          isLiked: false,
+          likesCount: confession.likesCount - 1,
+        );
+        notifyListeners();
+      }
+      await _confessionService.unlikeConfession(confessionId);
       return true;
     } catch (e) {
+      // Annuler la mise à jour optimiste en cas d'erreur
+      final index = _confessions.indexWhere((c) => c.id == confessionId);
+      if (index != -1) {
+        final confession = _confessions[index];
+        _confessions[index] = confession.copyWith(
+          isLiked: true,
+          likesCount: confession.likesCount + 1,
+        );
+        notifyListeners();
+      }
       if (kDebugMode) print('Error unliking confession: $e');
       return false;
+    } finally {
+      _likeInFlight.remove(confessionId);
     }
   }
 
@@ -205,6 +248,44 @@ class FeedProvider extends ChangeNotifier {
     } catch (e) {
       if (kDebugMode) print('Error creating confession: $e');
       return false;
+    }
+  }
+
+  /// Charge le cache local pour un affichage instantané au lancement.
+  Future<void> loadCachedFeed() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString(_cacheKey);
+      final tsString = prefs.getString(_cacheTimestampKey);
+
+      if (cached == null || tsString == null) return;
+
+      final cacheTime = DateTime.tryParse(tsString);
+      if (cacheTime == null ||
+          DateTime.now().difference(cacheTime) > _maxCacheAge) {
+        return;
+      }
+
+      final List<dynamic> jsonList = jsonDecode(cached);
+      _confessions = jsonList.map((j) => Confession.fromJson(j)).toList();
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) print('Error loading cached feed: $e');
+    }
+  }
+
+  Future<void> _cacheFeed() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList =
+          _confessions.take(20).map((c) => c.toJson()).toList();
+      await prefs.setString(_cacheKey, jsonEncode(jsonList));
+      await prefs.setString(
+        _cacheTimestampKey,
+        DateTime.now().toIso8601String(),
+      );
+    } catch (e) {
+      if (kDebugMode) print('Error caching feed: $e');
     }
   }
 

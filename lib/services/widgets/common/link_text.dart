@@ -21,7 +21,7 @@ class LinkText extends StatelessWidget {
     this.linkStyle,
     this.showPreview = false,
     this.maxLines,
-    this.overflow = TextOverflow.ellipsis,
+    this.overflow = TextOverflow.clip,
     this.previewBackgroundColor,
     this.previewTextColor,
   });

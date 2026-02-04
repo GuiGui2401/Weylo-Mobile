@@ -1,4 +1,4 @@
-package com.example.weylo_mobile
+package app.weylo.mobile
 
 import io.flutter.embedding.android.FlutterActivity
 

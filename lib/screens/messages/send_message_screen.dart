@@ -239,11 +239,7 @@ class _SendMessageScreenState extends State<SendMessageScreen>
     final conversationId = index?.sampleConversation?.id;
 
     if (conversationId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(content: Text(l10n.errorOccurredTitle)),
-      );
+      Helpers.showErrorSnackBar(context, l10n.errorOccurredTitle);
       return;
     }
 
@@ -303,14 +299,10 @@ class _SendMessageScreenState extends State<SendMessageScreen>
                   sampleConversation: conversation,
                 );
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            l10n.revealIdentitySuccessWithName(
-              conversation.otherParticipant?.fullName ?? user.fullName,
-            ),
-          ),
-          backgroundColor: Colors.green,
+      Helpers.showSuccessSnackBar(
+        context,
+        l10n.revealIdentitySuccessWithName(
+          conversation.otherParticipant?.fullName ?? user.fullName,
         ),
       );
     } catch (e) {
@@ -323,12 +315,7 @@ class _SendMessageScreenState extends State<SendMessageScreen>
         );
         context.push('/wallet');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.errorMessage(e.toString())),
-            backgroundColor: Colors.red,
-          ),
-        );
+        Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
       }
     } finally {
       if (!mounted) return;
@@ -626,16 +613,12 @@ class _SendMessageScreenState extends State<SendMessageScreen>
     final message = _messageController.text.trim();
 
     if (_selectedRecipient == null || _selectedRecipient!.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.selectRecipientError)));
+      Helpers.showErrorSnackBar(context, l10n.selectRecipientError);
       return;
     }
 
     if (message.isEmpty && _selectedImage == null && _voiceFile == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.enterMessageError)));
+      Helpers.showErrorSnackBar(context, l10n.enterMessageError);
       return;
     }
 
@@ -656,24 +639,14 @@ class _SendMessageScreenState extends State<SendMessageScreen>
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.messageSentSuccess),
-            backgroundColor: Colors.green,
-          ),
-        );
+        Helpers.showSuccessSnackBar(context, l10n.messageSentSuccess);
         Navigator.pop(context);
       }
     } catch (e) {
       setState(() {
         _isSending = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.errorMessage(e.toString())),
-          backgroundColor: Colors.red,
-        ),
-      );
+      Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
     }
   }
 

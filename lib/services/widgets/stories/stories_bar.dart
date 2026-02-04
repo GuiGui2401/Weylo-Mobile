@@ -567,11 +567,11 @@ Widget _buildStoryVideoThumbnailFromUrl(String? url) {
   final future = _storyVideoThumbCache.putIfAbsent(
     url,
     () => VideoThumbnail.thumbnailData(
-      video: url,
-      imageFormat: ImageFormat.JPEG,
-      quality: 70,
-      maxWidth: 720,
-    ),
+          video: url,
+          imageFormat: ImageFormat.JPEG,
+          quality: 70,
+          maxWidth: 720,
+        ).catchError((_) => null),
   );
 
   return FutureBuilder<Uint8List?>(

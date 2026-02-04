@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
@@ -17,6 +18,7 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus _status = AuthStatus.initial;
   User? _user;
   String? _error;
+  Timer? _errorTimer;
 
   AuthStatus get status => _status;
   User? get user => _user;
@@ -82,22 +84,26 @@ class AuthProvider extends ChangeNotifier {
         _status = AuthStatus.error;
         _error = response.message ?? 'Erreur de connexion';
         notifyListeners();
+        _scheduleErrorAutoClear();
         return false;
       }
     } on ValidationException catch (e) {
       _status = AuthStatus.error;
       _error = e.message;
       notifyListeners();
+      _scheduleErrorAutoClear();
       return false;
     } on AuthException catch (e) {
       _status = AuthStatus.error;
       _error = e.message;
       notifyListeners();
+      _scheduleErrorAutoClear();
       return false;
     } catch (e) {
       _status = AuthStatus.error;
       _error = e.toString();
       notifyListeners();
+      _scheduleErrorAutoClear();
       return false;
     }
   }
@@ -136,6 +142,7 @@ class AuthProvider extends ChangeNotifier {
         _status = AuthStatus.error;
         _error = response.message ?? 'Erreur d\'inscription';
         notifyListeners();
+        _scheduleErrorAutoClear();
         return false;
       }
     } on ValidationException catch (e) {
@@ -148,11 +155,13 @@ class AuthProvider extends ChangeNotifier {
         }
       }
       notifyListeners();
+      _scheduleErrorAutoClear();
       return false;
     } catch (e) {
       _status = AuthStatus.error;
       _error = e.toString();
       notifyListeners();
+      _scheduleErrorAutoClear();
       return false;
     }
   }
@@ -224,7 +233,18 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void clearError() {
+    _errorTimer?.cancel();
     _error = null;
     notifyListeners();
+  }
+
+  void _scheduleErrorAutoClear() {
+    _errorTimer?.cancel();
+    _errorTimer = Timer(const Duration(seconds: 6), () {
+      if (_error != null) {
+        _error = null;
+        notifyListeners();
+      }
+    });
   }
 }

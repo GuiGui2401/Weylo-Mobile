@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -8,13 +9,16 @@ import '../../services/deep_link_service.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/helpers.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/chat_service.dart';
 import '../../services/widgets/stories/stories_bar.dart';
 import '../../services/widgets/confessions/confession_card.dart';
+import '../../services/widgets/confessions/confession_card_skeleton.dart';
 import '../../services/widgets/common/empty_state.dart';
 import '../../services/widgets/promotions/promote_post_modal.dart';
+import '../../models/confession.dart';
 import '../../services/confession_service.dart';
 import '../../services/confession_background_uploader.dart';
 import '../../services/confession_upload_queue.dart';
@@ -36,8 +40,10 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<FeedProvider>().loadConfessions(refresh: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final feedProvider = context.read<FeedProvider>();
+      await feedProvider.loadCachedFeed();
+      feedProvider.loadConfessions(refresh: true);
     });
     _loadMaxStreak();
   }
@@ -127,7 +133,7 @@ class _FeedScreenState extends State<FeedScreen> {
       body: Consumer<FeedProvider>(
         builder: (context, feedProvider, child) {
           if (feedProvider.isLoading && feedProvider.confessions.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const FeedSkeletonList();
           }
 
           if (feedProvider.error != null && feedProvider.confessions.isEmpty) {
@@ -250,8 +256,12 @@ class _FeedScreenState extends State<FeedScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _CreatePostSheet(
-        onPostCreated: () {
-          this.context.read<FeedProvider>().refresh();
+        onPostCreated: (confession) {
+          if (confession != null) {
+            this.context.read<FeedProvider>().insertAtTop(confession);
+          } else {
+            this.context.read<FeedProvider>().refresh();
+          }
         },
       ),
     );
@@ -434,7 +444,7 @@ class _ContactRecommendationsSection extends StatelessWidget {
 
 /// Widget for creating a new post
 class _CreatePostSheet extends StatefulWidget {
-  final VoidCallback? onPostCreated;
+  final void Function(Confession?)? onPostCreated;
 
   const _CreatePostSheet({this.onPostCreated});
 
@@ -458,6 +468,14 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
     super.dispose();
   }
 
+  Future<File> _saveFilePermanently(XFile file) async {
+    final Directory appDir = await getApplicationDocumentsDirectory();
+    final String fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+    final String savedPath = '${appDir.path}/$fileName';
+    final File savedFile = await File(file.path).copy(savedPath);
+    return savedFile;
+  }
+
   Future<void> _pickImage() async {
     final XFile? image = await _imagePicker.pickImage(
       source: ImageSource.gallery,
@@ -467,8 +485,9 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
     );
 
     if (image != null) {
+      final savedFile = await _saveFilePermanently(image);
       setState(() {
-        _selectedImage = File(image.path);
+        _selectedImage = savedFile;
         _selectedVideo = null;
       });
     }
@@ -481,8 +500,9 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
     );
 
     if (image != null) {
+      final savedFile = await _saveFilePermanently(image);
       setState(() {
-        _selectedImage = File(image.path);
+        _selectedImage = savedFile;
         _selectedVideo = null;
       });
     }
@@ -495,8 +515,9 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
     );
 
     if (video != null) {
+      final savedFile = await _saveFilePermanently(video);
       setState(() {
-        _selectedVideo = File(video.path);
+        _selectedVideo = savedFile;
         _selectedImage = null;
       });
     }
@@ -511,8 +532,9 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
     );
 
     if (image != null) {
+      final savedFile = await _saveFilePermanently(image);
       setState(() {
-        _selectedImage = File(image.path);
+        _selectedImage = savedFile;
         _selectedVideo = null;
       });
     }
@@ -523,9 +545,7 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
     final l10n = AppLocalizations.of(context)!;
 
     if (content.isEmpty && _selectedImage == null && _selectedVideo == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.addContentOrMediaError)));
+      Helpers.showErrorSnackBar(context, l10n.addContentOrMediaError);
       return;
     }
 
@@ -533,6 +553,7 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
 
     final hasMedia = _selectedImage != null || _selectedVideo != null;
     if (hasMedia) {
+      // The path of _selectedImage or _selectedVideo is now the permanent path
       final job = ConfessionUploadJob(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         type: 'public',
@@ -545,16 +566,14 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
       await ConfessionBackgroundUploader.enqueue(job);
       if (mounted) {
         Navigator.pop(context);
-        widget.onPostCreated?.call();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.statusSending)),
-        );
+        widget.onPostCreated?.call(null);
+        Helpers.showSnackBar(context, l10n.statusSending);
       }
       return;
     }
 
     try {
-      await _confessionService.createConfession(
+      final newConfession = await _confessionService.createConfession(
         content: content.isNotEmpty ? content : '',
         type: 'public',
         isAnonymous: !_isPublic,
@@ -562,22 +581,12 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
 
       if (mounted) {
         Navigator.pop(context);
-        widget.onPostCreated?.call();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.postCreatedSuccess),
-            backgroundColor: Colors.green,
-          ),
-        );
+        widget.onPostCreated?.call(newConfession);
+        Helpers.showSuccessSnackBar(context, l10n.postCreatedSuccess);
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.errorMessage(e.toString())),
-          backgroundColor: Colors.red,
-        ),
-      );
+      Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
     }
   }
 

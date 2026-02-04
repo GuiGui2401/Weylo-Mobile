@@ -11,17 +11,39 @@ class StoryBackgroundUploader {
 
   static Future<void> initialize() async {
     if (_initialized) return;
-    _uploader.result.listen((result) async {
-      final taskId = result.taskId;
-      final queue = StoryUploadQueue();
-      final jobId = await queue.popJobIdForTask(taskId);
-      if (jobId != null) {
-        await queue.remove(jobId);
-      }
-      if (result.status == UploadTaskStatus.complete) {
-        await LocalNotificationService.showStoryUploaded();
-      }
-    });
+    _uploader.result.listen(
+      (result) async {
+        debugPrint(
+          '[StoryBackgroundUploader] Upload Result: taskId=${result.taskId}, status=${result.status}, statusCode=${result.statusCode}, response=${result.response}',
+        );
+
+        final taskId = result.taskId;
+        final queue = StoryUploadQueue();
+        final jobId = await queue.popJobIdForTask(taskId);
+
+        if (result.status == UploadTaskStatus.complete) {
+          if (jobId != null) {
+            await queue.remove(jobId);
+          }
+          await LocalNotificationService.showStoryUploaded();
+        } else if (result.status == UploadTaskStatus.failed) {
+          debugPrint(
+            '[StoryBackgroundUploader] Upload FAILED: taskId=${result.taskId}, statusCode=${result.statusCode}, response=${result.response}',
+          );
+          if (jobId != null) {
+            await queue.remove(jobId);
+          }
+        } else if (result.status == UploadTaskStatus.running) {
+          debugPrint('[StoryBackgroundUploader] Upload RUNNING: taskId=${result.taskId}');
+        } else if (result.status == UploadTaskStatus.enqueued) {
+          debugPrint('[StoryBackgroundUploader] Upload ENQUEUED: taskId=${result.taskId}');
+        }
+      },
+      onError: (ex, stacktrace) {
+        debugPrint('[StoryBackgroundUploader] Upload Stream ERROR: $ex');
+        debugPrint(stacktrace.toString());
+      },
+    );
     _initialized = true;
   }
 

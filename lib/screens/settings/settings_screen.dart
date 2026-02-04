@@ -282,21 +282,16 @@ class SettingsScreen extends StatelessWidget {
     try {
       await context.read<AuthProvider>().updateSettings({'language': language});
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              language == 'fr'
-                  ? l10n.languageChangedToFrench
-                  : l10n.languageChangedToEnglish,
-            ),
-          ),
+        Helpers.showSuccessSnackBar(
+          context,
+          language == 'fr'
+              ? l10n.languageChangedToFrench
+              : l10n.languageChangedToEnglish,
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.errorMessage(e.toString()))),
-        );
+        Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
       }
     }
   }

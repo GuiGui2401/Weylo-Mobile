@@ -124,6 +124,8 @@ class _ChatScreenState extends State<ChatScreen> {
         debugPrint(
           '[ChatScreen] Incoming chat message -> id: ${chatMessage.id}, sender: ${chatMessage.senderId}, content: "${chatMessage.content}"',
         );
+        // Skip if this message already exists (from optimistic insert)
+        if (_messages.any((m) => m.id == chatMessage.id)) return;
         _messageDeliveryStatus[chatMessage.id] = chatMessage.isRead
             ? MessageDeliveryStatus.read
             : MessageDeliveryStatus.sent;
@@ -183,6 +185,28 @@ class _ChatScreenState extends State<ChatScreen> {
               content: widget.initialReplyContent!,
             );
           });
+        } else {
+          // Le message n'est pas encore indexé par le serveur.
+          // Fallback : attacher le reply preview au dernier message envoyé,
+          // ou afficher un pending reply preview dans la zone de saisie.
+          final lastOwn = _messages
+              .where((m) => m.senderId == currentUserId)
+              .firstOrNull;
+          if (lastOwn != null) {
+            setState(() {
+              _localReplyPreview[lastOwn.id] = _ReplyPreviewData(
+                title: widget.initialReplyTitle ?? l10n.anonymousMessage,
+                content: widget.initialReplyContent!,
+              );
+            });
+          } else {
+            setState(() {
+              _pendingReplyPreview = _ReplyPreviewData(
+                title: widget.initialReplyTitle ?? l10n.anonymousMessage,
+                content: widget.initialReplyContent!,
+              );
+            });
+          }
         }
       }
 
@@ -254,9 +278,7 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.audioPlaybackError(e.toString()))),
-        );
+        Helpers.showErrorSnackBar(context, l10n.audioPlaybackError(e.toString()));
       }
     } finally {
       if (mounted) {
@@ -274,18 +296,29 @@ class _ChatScreenState extends State<ChatScreen> {
       Uri.parse(mediaUrl),
       httpHeaders: const {'Accept': '*/*', 'Range': 'bytes=0-'},
     );
+    var hasShownError = false;
     try {
       await controller.initialize();
     } catch (e) {
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.videoPlaybackError(e.toString()))),
-        );
+        Helpers.showErrorSnackBar(context, l10n.videoPlaybackError(e.toString()));
       }
       await controller.dispose();
       return;
     }
+
+    controller.addListener(() {
+      if (hasShownError) return;
+      if (controller.value.hasError) {
+        hasShownError = true;
+        if (mounted) {
+          final l10n = AppLocalizations.of(context)!;
+          Helpers.showErrorSnackBar(context, l10n.videoPlaybackError(''));
+        }
+        Navigator.of(context, rootNavigator: true).maybePop();
+      }
+    });
 
     if (!mounted) {
       await controller.dispose();
@@ -472,58 +505,111 @@ class _ChatScreenState extends State<ChatScreen> {
     debugPrint(
       '[ChatScreen] Sending message -> content: "$content", replyTo: ${_replyTo?.id}',
     );
-    _pendingMessageContent = content;
+
+    // Capture state before clearing
+    final replyToId = _replyTo?.id;
+    final pendingReply = _replyTo == null ? _pendingReplyPreview : null;
+    final capturedImage = _selectedImage;
+    final capturedVideo = _selectedVideo;
+    final capturedVoice = _voiceFile;
+    final capturedVoiceEffect = _selectedVoiceEffect;
+    final currentUserId = context.read<AuthProvider>().user?.id ?? 0;
+
+    // Create a temporary optimistic message
+    final tempId = -DateTime.now().millisecondsSinceEpoch;
+    String? tempType = 'text';
+    if (capturedVoice != null) {
+      tempType = 'voice';
+    } else if (capturedVideo != null) {
+      tempType = 'video';
+    } else if (capturedImage != null) {
+      tempType = 'image';
+    }
+
+    final tempMessage = ChatMessage(
+      id: tempId,
+      conversationId: widget.conversationId,
+      senderId: currentUserId,
+      content: content,
+      type: tempType,
+      replyToId: replyToId,
+      replyTo: _replyTo,
+      createdAt: DateTime.now(),
+    );
+
+    // Immediately insert the temp message and clear input
+    _messageDeliveryStatus[tempId] = MessageDeliveryStatus.sending;
     setState(() {
       _isSending = true;
+      _messages.insert(0, tempMessage);
+      _replyTo = null;
+      _pendingReplyPreview = null;
+      _selectedImage = null;
+      _selectedVideo = null;
+      _voiceFile = null;
+      _selectedVoiceEffect = null;
+      _showVoiceRecorder = false;
     });
+    _messageController.clear();
+    _pendingMessageContent = null;
+    if (pendingReply != null) {
+      _localReplyPreview[tempId] = pendingReply;
+    }
+    _scrollToBottom();
 
     try {
-      final replyToId = _replyTo?.id;
-      final pendingReply = _replyTo == null ? _pendingReplyPreview : null;
       final message = await _chatService.sendMessage(
         widget.conversationId,
         content: content.isEmpty ? null : content,
         replyToId: replyToId,
-        image: _selectedImage,
-        video: _selectedVideo,
-        voice: _voiceFile,
-        voiceEffect: _selectedVoiceEffect != null
-            ? VoiceEffectsService.effectToString(_selectedVoiceEffect!)
+        image: capturedImage,
+        video: capturedVideo,
+        voice: capturedVoice,
+        voiceEffect: capturedVoiceEffect != null
+            ? VoiceEffectsService.effectToString(capturedVoiceEffect)
             : null,
       );
 
       debugPrint(
         '[ChatScreen] Message sent -> id: ${message.id}, data: ${message.content}',
       );
+
+      // Replace temp message with real one
+      _messageDeliveryStatus.remove(tempId);
       _messageDeliveryStatus[message.id] = MessageDeliveryStatus.sent;
-
-      setState(() {
-        _messages.insert(0, message);
-        _replyTo = null;
-        _pendingReplyPreview = null;
-        _selectedImage = null;
-        _selectedVideo = null;
-        _voiceFile = null;
-        _selectedVoiceEffect = null;
-        _showVoiceRecorder = false;
-      });
-
-      _messageController.clear();
-      _pendingMessageContent = null;
       if (pendingReply != null) {
+        _localReplyPreview.remove(tempId);
         _localReplyPreview[message.id] = pendingReply;
       }
-      _scrollToBottom();
+
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+          final idx = _messages.indexWhere((m) => m.id == tempId);
+          if (idx != -1) {
+            _messages[idx] = message;
+          }
+        });
+      }
     } catch (e) {
       debugPrint('[ChatScreen] Message send failed -> error: $e');
-      Helpers.showErrorSnackBar(
-        context,
-        AppLocalizations.of(context)!.chatSendError,
-      );
+      _messageDeliveryStatus[tempId] = MessageDeliveryStatus.failed;
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+          _messages.removeWhere((m) => m.id == tempId);
+        });
+        Helpers.showErrorSnackBar(
+          context,
+          AppLocalizations.of(context)!.chatSendError,
+        );
+      }
     } finally {
-      setState(() {
-        _isSending = false;
-      });
+      if (mounted && _isSending) {
+        setState(() {
+          _isSending = false;
+        });
+      }
     }
   }
 
@@ -638,10 +724,14 @@ class _ChatScreenState extends State<ChatScreen> {
       body: _isLoading
           ? const LoadingWidget()
           : Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 image: DecorationImage(
-                  image: AssetImage('assets/images/fond.png'),
+                  image: const AssetImage('assets/images/fond.png'),
                   fit: BoxFit.cover,
+                  colorFilter: ColorFilter.mode(
+                    Colors.black.withOpacity(0.4),
+                    BlendMode.darken,
+                  ),
                 ),
               ),
               child: Column(
@@ -788,31 +878,21 @@ class _ChatScreenState extends State<ChatScreen> {
                                                   );
                                                 });
                                                 if (mounted) {
-                                                  ScaffoldMessenger.of(
+                                                  Helpers.showSuccessSnackBar(
                                                     context,
-                                                  ).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        AppLocalizations.of(
-                                                          context,
-                                                        )!.messageDeleted,
-                                                      ),
-                                                    ),
+                                                    AppLocalizations.of(
+                                                      context,
+                                                    )!.messageDeleted,
                                                   );
                                                 }
                                               } catch (e) {
                                                 if (mounted) {
-                                                  ScaffoldMessenger.of(
+                                                  Helpers.showErrorSnackBar(
                                                     context,
-                                                  ).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        AppLocalizations.of(
-                                                          context,
-                                                        )!.errorMessage(
-                                                          e.toString(),
-                                                        ),
-                                                      ),
+                                                    AppLocalizations.of(
+                                                      context,
+                                                    )!.errorMessage(
+                                                      e.toString(),
                                                     ),
                                                   );
                                                 }
@@ -1600,10 +1680,10 @@ class _MessageBubble extends StatelessWidget {
     final future = _videoThumbCache.putIfAbsent(
       url,
       () => VideoThumbnail.thumbnailData(
-        video: url,
-        imageFormat: ImageFormat.JPEG,
-        quality: 70,
-      ),
+            video: url,
+            imageFormat: ImageFormat.JPEG,
+            quality: 70,
+          ).catchError((_) => null),
     );
     return GestureDetector(
       onTap: onOpenVideo,

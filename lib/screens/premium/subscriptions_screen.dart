@@ -62,15 +62,11 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
       await _premiumService.cancelSubscription(subscription.id);
       await _loadData();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.subscriptionCancelled)));
+        Helpers.showSuccessSnackBar(context, l10n.subscriptionCancelled);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.errorMessage(e.toString()))),
-        );
+        Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
       }
     }
   }

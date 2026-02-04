@@ -207,9 +207,7 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
     } catch (e) {
       setState(() => _isSendingComment = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.errorMessage(e.toString()))),
-        );
+        Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
       }
     }
   }
@@ -240,9 +238,7 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.errorMessage(e.toString()))),
-        );
+        Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
       }
     }
   }
@@ -275,15 +271,6 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
       appBar: AppBar(
         title: Text(l10n.postTitle),
         actions: [
-          // Bouton pour révéler l'identité si la publication est anonyme
-          if (_confession != null &&
-              !_confession!.isIdentityRevealed &&
-              _confession!.isAnonymous)
-            IconButton(
-              icon: const Icon(Icons.visibility),
-              onPressed: _showRevealIdentityDialog,
-              tooltip: l10n.revealIdentityTitle,
-            ),
           IconButton(
             icon: const Icon(Icons.share_outlined),
             onPressed: _shareConfession,
@@ -682,41 +669,16 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
         size: 48,
       );
     }
-    // Avatar anonyme avec possibilité de révéler l'identité
-    return GestureDetector(
-      onTap: _confession!.isAnonymous ? _showRevealIdentityDialog : null,
-      child: Stack(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Icon(Icons.person_off, color: Colors.white, size: 24),
-            ),
-          ),
-          if (_confession!.isAnonymous)
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1877F2),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: const Icon(
-                  Icons.visibility,
-                  color: Colors.white,
-                  size: 10,
-                ),
-              ),
-            ),
-        ],
+    // Avatar anonyme
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        gradient: AppColors.primaryGradient,
+        shape: BoxShape.circle,
+      ),
+      child: const Center(
+        child: Icon(Icons.person_off, color: Colors.white, size: 24),
       ),
     );
   }
@@ -1078,12 +1040,9 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorMessage(e.toString()),
-            ),
-          ),
+        Helpers.showErrorSnackBar(
+          context,
+          AppLocalizations.of(context)!.errorMessage(e.toString()),
         );
       }
     } finally {
@@ -1151,15 +1110,11 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
                     }
                   });
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Commentaire supprimé')),
-                    );
+                    Helpers.showSuccessSnackBar(context, 'Commentaire supprimé');
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.errorMessage(e.toString()))),
-                    );
+                    Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
                   }
                 }
               },
@@ -1377,19 +1332,6 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Option pour révéler l'identité si anonyme
-            if (_confession != null &&
-                !_confession!.isIdentityRevealed &&
-                _confession!.isAnonymous)
-              ListTile(
-                leading: const Icon(Icons.visibility, color: Colors.amber),
-                title: Text(l10n.revealIdentityTitle),
-                subtitle: Text(l10n.revealIdentityCost('450 FCFA')),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showRevealIdentityDialog();
-                },
-              ),
             ListTile(
               leading: const Icon(Icons.share_outlined),
               title: Text(l10n.shareAction),
@@ -1412,161 +1354,6 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
     );
   }
 
-  void _showRevealIdentityDialog() {
-    final l10n = AppLocalizations.of(context)!;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.visibility, color: Colors.white),
-            ),
-            const SizedBox(width: 12),
-            Text(l10n.revealIdentityTitle),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l10n.revealIdentityPrompt('450 FCFA')),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.amber.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.account_balance_wallet, color: Colors.amber),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.costLabel,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      Text(
-                        l10n.revealIdentityAmount('450 FCFA'),
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber[800],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.cancel),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                Navigator.pop(context);
-                await _revealIdentity();
-              },
-              icon: const Icon(Icons.visibility, size: 18),
-              label: Text(l10n.revealIdentityAction),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                foregroundColor: Colors.white,
-                shadowColor: Colors.transparent,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _revealIdentity() async {
-    final l10n = AppLocalizations.of(context)!;
-    try {
-      // Afficher un indicateur de chargement
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
-
-      final updatedConfession = await _confessionService.revealIdentity(
-        widget.confessionId,
-      );
-
-      if (mounted) {
-        Navigator.pop(context); // Fermer le loading
-        setState(() {
-          _confession = updatedConfession;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    updatedConfession.author != null
-                        ? l10n.revealIdentitySuccessWithName(
-                            updatedConfession.author!.fullName,
-                          )
-                        : l10n.revealIdentitySuccess,
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Fermer le loading
-        if (e is AppException && e.statusCode == 402) {
-          final requiredAmount = Helpers.extractRequiredAmount(e.data);
-          Helpers.showErrorSnackBar(
-            context,
-            Helpers.insufficientBalanceMessage(
-              requiredAmount: requiredAmount,
-            ),
-          );
-          context.push('/wallet');
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.errorMessage(e.toString())),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
   void _reportConfession() {
     final l10n = AppLocalizations.of(context)!;
     showDialog(
@@ -1585,15 +1372,11 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
               try {
                 await _confessionService.reportConfession(widget.confessionId);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.reportPostSuccess)),
-                  );
+                  Helpers.showSuccessSnackBar(context, l10n.reportPostSuccess);
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.errorMessage(e.toString()))),
-                  );
+                  Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
                 }
               }
             },

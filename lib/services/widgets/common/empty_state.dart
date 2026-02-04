@@ -10,6 +10,8 @@ class EmptyState extends StatelessWidget {
   final String? buttonText;
   final VoidCallback? onButtonPressed;
   final double iconSize;
+  final Color? titleColor;
+  final Color? subtitleColor;
 
   const EmptyState({
     super.key,
@@ -21,6 +23,8 @@ class EmptyState extends StatelessWidget {
     VoidCallback? onButtonPressed,
     VoidCallback? onAction,
     this.iconSize = 80,
+    this.titleColor,
+    this.subtitleColor,
   }) : buttonText = buttonText ?? actionLabel,
        onButtonPressed = onButtonPressed ?? onAction;
 
@@ -50,7 +54,10 @@ class EmptyState extends StatelessWidget {
               title,
               style: Theme.of(
                 context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
+              ).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: titleColor,
+              ),
               textAlign: TextAlign.center,
             ),
             if (subtitle != null) ...[
@@ -58,7 +65,7 @@ class EmptyState extends StatelessWidget {
               Text(
                 subtitle!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
+                  color: subtitleColor ?? AppColors.textSecondary,
                 ),
                 textAlign: TextAlign.center,
               ),

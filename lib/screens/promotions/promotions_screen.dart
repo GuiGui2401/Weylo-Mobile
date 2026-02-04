@@ -303,11 +303,11 @@ class _PromotionsScreenState extends State<PromotionsScreen> {
     final future = _videoThumbCache.putIfAbsent(
       url,
       () => VideoThumbnail.thumbnailData(
-        video: url,
-        imageFormat: ImageFormat.JPEG,
-        quality: 70,
-        maxWidth: 360,
-      ),
+            video: url,
+            imageFormat: ImageFormat.JPEG,
+            quality: 70,
+            maxWidth: 360,
+          ).catchError((_) => null),
     );
     return FutureBuilder<Uint8List?>(
       future: future,

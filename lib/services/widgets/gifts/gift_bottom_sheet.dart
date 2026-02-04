@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/helpers.dart';
 import '../../../models/gift.dart';
 import '../../gift_service.dart';
 import 'package:lottie/lottie.dart';
@@ -45,8 +46,10 @@ class GiftBottomSheet extends StatefulWidget {
   State<GiftBottomSheet> createState() => _GiftBottomSheetState();
 }
 
-class _GiftBottomSheetState extends State<GiftBottomSheet> {
+class _GiftBottomSheetState extends State<GiftBottomSheet>
+    with SingleTickerProviderStateMixin {
   final GiftService _giftService = GiftService();
+  late final AnimationController _emojiPulseController;
 
   List<GiftCategory> _categories = [];
   List<Gift> _gifts = [];
@@ -60,7 +63,17 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
   @override
   void initState() {
     super.initState();
+    _emojiPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
     _loadCategories();
+  }
+
+  @override
+  void dispose() {
+    _emojiPulseController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCategories() async {
@@ -131,19 +144,18 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
       setState(() {
         _isSending = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.errorMessage(e.toString()))));
+      Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: _showSuccess ? _buildSuccessView() : _buildGiftSelector(),
     );
@@ -164,7 +176,13 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
           const SizedBox(height: 16),
           Text(
             l10n.giftSentTitle,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black87,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -173,7 +191,11 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
               widget.recipientUsername,
             ),
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey[600]),
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.grey[400]
+                  : Colors.grey[600],
+            ),
           ),
         ],
       ),
@@ -197,9 +219,12 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                 child: Text(
                   l10n.sendGiftToUser(widget.recipientUsername),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black87,
                   ),
                 ),
               ),
@@ -234,14 +259,22 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                     ),
                     decoration: BoxDecoration(
                       gradient: isSelected ? AppColors.primaryGradient : null,
-                      color: isSelected ? null : Colors.grey[200],
+                      color: isSelected
+                          ? null
+                          : Theme.of(context).brightness == Brightness.dark
+                              ? Colors.grey[800]
+                              : Colors.grey[200],
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Center(
                       child: Text(
                         category.name,
                         style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black87,
+                          color: isSelected
+                              ? Colors.white
+                              : Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white70
+                                  : Colors.black87,
                           fontWeight: isSelected
                               ? FontWeight.bold
                               : FontWeight.normal,
@@ -282,7 +315,9 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                         decoration: BoxDecoration(
                           color: isSelected
                               ? AppColors.primary.withOpacity(0.1)
-                              : Colors.grey[100],
+                              : Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.grey[850] ?? Colors.grey[800]
+                                  : Colors.grey[100],
                           borderRadius: BorderRadius.circular(12),
                           border: isSelected
                               ? Border.all(color: AppColors.primary, width: 2)
@@ -295,9 +330,12 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                             const SizedBox(height: 4),
                             Text(
                               gift.name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                               textAlign: TextAlign.center,
                               maxLines: 1,
@@ -327,7 +365,7 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
             bottom: MediaQuery.of(context).padding.bottom + 12,
           ),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).scaffoldBackgroundColor,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -350,7 +388,14 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                     },
                     activeColor: AppColors.secondary,
                   ),
-                  Text(l10n.sendAnonymouslyLabel),
+                  Text(
+                    l10n.sendAnonymouslyLabel,
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.black87,
+                    ),
+                  ),
                   const Spacer(),
                   if (_selectedGift != null)
                     Text(
@@ -374,7 +419,9 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                       : null,
                   color: _selectedGift != null && !_isSending
                       ? null
-                      : Colors.grey[300],
+                      : Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey[700]
+                          : Colors.grey[300],
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: _selectedGift != null && !_isSending
                       ? [
@@ -412,7 +459,9 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                                 fontWeight: FontWeight.bold,
                                 color: _selectedGift != null
                                     ? Colors.white
-                                    : Colors.grey,
+                                    : Theme.of(context).brightness == Brightness.dark
+                                        ? Colors.grey[400]
+                                        : Colors.grey,
                               ),
                             ),
                     ),
@@ -456,9 +505,16 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
     }
 
     if (isEmojiIcon) {
-      return Text(
-        rawIcon,
-        style: const TextStyle(fontSize: 40),
+      return AnimatedBuilder(
+        animation: _emojiPulseController,
+        builder: (context, child) {
+          final scale = 1.0 + 0.1 * _emojiPulseController.value;
+          return Transform.scale(scale: scale, child: child);
+        },
+        child: Text(
+          rawIcon,
+          style: const TextStyle(fontSize: 40),
+        ),
       );
     }
 

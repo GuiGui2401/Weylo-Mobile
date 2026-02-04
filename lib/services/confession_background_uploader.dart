@@ -11,17 +11,40 @@ class ConfessionBackgroundUploader {
 
   static Future<void> initialize() async {
     if (_initialized) return;
-    _uploader.result.listen((result) async {
-      final taskId = result.taskId;
-      final queue = ConfessionUploadQueue();
-      final jobId = await queue.popJobIdForTask(taskId);
-      if (jobId != null) {
-        await queue.remove(jobId);
-      }
-      if (result.status == UploadTaskStatus.complete) {
-        await LocalNotificationService.showPostUploaded();
-      }
-    });
+    _uploader.result.listen(
+      (result) async {
+        debugPrint(
+          '[ConfessionBackgroundUploader] Upload Result: taskId=${result.taskId}, status=${result.status}, statusCode=${result.statusCode}, response=${result.response}',
+        );
+
+        final taskId = result.taskId;
+        final queue = ConfessionUploadQueue();
+        final jobId = await queue.popJobIdForTask(taskId);
+
+        if (result.status == UploadTaskStatus.complete) {
+          if (jobId != null) {
+            await queue.remove(jobId);
+          }
+          await LocalNotificationService.showPostUploaded();
+        } else if (result.status == UploadTaskStatus.failed) {
+          debugPrint(
+            '[ConfessionBackgroundUploader] Upload FAILED: taskId=${result.taskId}, statusCode=${result.statusCode}, response=${result.response}',
+          );
+          if (jobId != null) {
+            // Optionally, handle retry logic here or just remove the job
+            await queue.remove(jobId);
+          }
+        } else if (result.status == UploadTaskStatus.running) {
+          debugPrint('[ConfessionBackgroundUploader] Upload RUNNING: taskId=${result.taskId}');
+        } else if (result.status == UploadTaskStatus.enqueued) {
+          debugPrint('[ConfessionBackgroundUploader] Upload ENQUEUED: taskId=${result.taskId}');
+        }
+      },
+      onError: (ex, stacktrace) {
+        debugPrint('[ConfessionBackgroundUploader] Upload Stream ERROR: $ex');
+        debugPrint(stacktrace.toString());
+      },
+    );
     _initialized = true;
   }
 

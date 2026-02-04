@@ -10,6 +10,8 @@ import 'providers/theme_provider.dart';
 import 'providers/feed_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/wallet_provider.dart';
+import 'providers/messages_provider.dart';
+import 'providers/conversations_provider.dart';
 import 'routes/app_router.dart';
 import 'services/deep_link_service.dart';
 import 'services/local_notification_service.dart';
@@ -55,6 +57,8 @@ class WeyloApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FeedProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => WalletProvider()),
+        ChangeNotifierProvider(create: (_) => MessagesProvider()),
+        ChangeNotifierProvider(create: (_) => ConversationsProvider()),
       ],
       child: const _AppContent(),
     );

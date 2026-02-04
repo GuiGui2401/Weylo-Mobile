@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../l10n/app_localizations.dart';
+import '../../core/utils/helpers.dart';
 import '../../services/premium_service.dart';
 import '../../services/widgets/common/widgets.dart';
 
@@ -44,21 +45,16 @@ class _PremiumSettingsScreenState extends State<PremiumSettingsScreen> {
       }
       await _loadStatus();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _status?.autoRenew == true
-                  ? l10n.autoRenewEnabled
-                  : l10n.autoRenewDisabled,
-            ),
-          ),
+        Helpers.showSuccessSnackBar(
+          context,
+          _status?.autoRenew == true
+              ? l10n.autoRenewEnabled
+              : l10n.autoRenewDisabled,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.errorMessage(e.toString()))),
-        );
+        Helpers.showErrorSnackBar(context, l10n.errorMessage(e.toString()));
       }
     }
   }
